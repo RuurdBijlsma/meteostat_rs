@@ -1,24 +1,42 @@
 [package]
-name = "meteostat-rs"
+name = "meteostat"
 version = "0.1.0"
 edition = "2021"
+license = "Apache-2.0"
+description = "Get historic weather data from thousands of weather stations around the world."
+authors = ["Ruurd Bijlsma <ruurd@bijlsma.dev>"]
+homepage = "https://github.com/ruurdbijlsma/meteostat-rs"
+repository = "https://github.com/ruurdbijlsma/meteostat-rs"
+readme = "README.md"
+keywords = ["meteostat", "weather", "historic", "temperature", "climate"]
+documentation = "https://docs.rs/meteostat/latest/meteostat/index.html"
+exclude = [
+    "data",
+    ".github",
+    "checks",
+    ".idea",
+]
+categories = ["science::geo"]
+
+[[bench]]
+name = "meteostat"
+harness = false
 
 [dependencies]
 reqwest = { version = "0.12.15", features = ["blocking", "json", "gzip", "stream"] }
 async-compression = { version = "0.4", features = ["tokio", "gzip"] }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = { version = "1.0", features = ["unbounded_depth"] }
-flate2 = "1.1.1"
 geo = "0.30"
-polars = { version = "0.46.0", features = ["csv", "dtype-datetime", "temporal", "strings"] }
-thiserror = "2.0.12"
-chrono = "0.4"
-log = "0.4"
+polars = { version = "0.46.0", features = ["lazy", "csv", "dtype-datetime", "temporal", "strings", "polars-io", "parquet"] }
+chrono = { version = "0.4.40", features = ["serde"] }
 env_logger = "0.11"
-geographiclib-rs = "0.2"
 tokio = { version = "1.44.2", features = ["full"] }
 anyhow = "1.0.97"
 futures-util = "0.3.31"
 tokio-util = { version = "0.7.14", features = ["io-util"] }
 tempfile = "3.19.1"
-bytes = "1.10.1"
+dirs = "6.0.0"
+
+[dev-dependencies]
+criterion = "0.5.1"
