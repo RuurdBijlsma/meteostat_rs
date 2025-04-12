@@ -1,5 +1,5 @@
 use anyhow::Result;
-use meteostat::get_hourly_lazy::get_hourly;
+use meteostat::get_hourly::get_hourly;
 
 #[tokio::main]
 async fn main() -> Result<()> {
