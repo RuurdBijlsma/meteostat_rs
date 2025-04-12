@@ -10,27 +10,31 @@ use tokio::io::{self, AsyncReadExt};
 use tokio::{fs, task};
 use tokio_util::io::StreamReader;
 
-
-pub async fn get_hourly(station: &str) -> Result<DataFrame> {
-    println!("[get_hourly] Station: {}", station);
+/// Returns a LazyFrame for the requested station.
+pub async fn get_hourly_lazy(station: &str) -> Result<LazyFrame> {
+    println!("[get_hourly_lazy] Station: {}", station);
     let cache_dir = home_dir().expect("Couldn't get home dir").join(".cache");
     let parquet_path = cache_dir.join(format!("hourly-{}.parquet", station));
 
     // Check if cached file exists
-    if fs::metadata(&parquet_path).await.is_ok() {
-        return get_hourly_from_cache(station, &cache_dir).await;
+    if fs::metadata(&parquet_path).await.is_err() {
+        // If not, download and cache
+        let df = download_hourly(station).await?;
+
+        // Ensure cache directory exists
+        fs::create_dir_all(&cache_dir).await?;
+
+        // Write to cache
+        write_parquet(df, &parquet_path).await?;
     }
 
-    // If not, download and cache
-    let df = download_hourly(station).await?;
+    // Return LazyFrame directly from Parquet
+    let path_str = parquet_path.to_str().unwrap();
+    let lf = LazyFrame::scan_parquet(path_str, Default::default())
+        .with_context(|| format!("Failed to scan parquet file at {:?}", parquet_path))?;
 
-    // Ensure cache directory exists
-    fs::create_dir_all(&cache_dir).await?;
 
-    // Write to cache
-    write_parquet(df.clone(), &parquet_path).await?;
-
-    Ok(df)
+    Ok(lf)
 }
 
 async fn write_parquet(df: DataFrame, path: &Path) -> Result<()> {
@@ -40,20 +44,6 @@ async fn write_parquet(df: DataFrame, path: &Path) -> Result<()> {
         let file = std::fs::File::create(&path)?;
         ParquetWriter::new(file).finish(&mut df.clone())?;
         Ok(())
-    }).await?
-}
-
-pub async fn get_hourly_from_cache(station: &str, cache_dir: &Path) -> Result<DataFrame> {
-    println!("Getting hourly from cache: {}", station);
-    let parquet_path = cache_dir.join(format!("hourly-{}.parquet", station));
-
-    task::spawn_blocking(move || {
-        let file = std::fs::File::open(&parquet_path)
-            .with_context(|| format!("Failed to open parquet file at {:?}", parquet_path))?;
-
-        ParquetReader::new(file)
-            .finish()
-            .with_context(|| format!("Failed to read parquet file at {:?}", parquet_path))
     })
         .await?
 }
@@ -78,5 +68,6 @@ async fn download_hourly(station: &str) -> Result<DataFrame> {
         CsvReader::new(std::io::Cursor::new(decompressed))
             .finish()
             .map_err(Into::into)
-    }).await?
+    })
+        .await?
 }
