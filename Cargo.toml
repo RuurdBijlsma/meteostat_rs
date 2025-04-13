@@ -30,7 +30,6 @@ serde_json = { version = "1.0", features = ["unbounded_depth"] }
 polars = { version = "0.46.0", features = ["lazy", "csv", "dtype-datetime", "temporal", "strings", "polars-io", "parquet"] }
 chrono = { version = "0.4.40", features = ["serde"] }
 tokio = { version = "1.44.2", features = ["full"] }
-anyhow = "1.0.97"
 futures-util = "0.3.31"
 tokio-util = { version = "0.7.14", features = ["io", "io-util"] }
 haversine = "0.2.1"
@@ -38,6 +37,8 @@ bincode = { version = "2.0.1", features = ["serde"] }
 rstar = "0.12.2"
 dirs = "6.0.0"
 tempfile = "3.19.1"
+thiserror = "2.0.12"
+log = "0.4.27"
 
 
 [dev-dependencies]

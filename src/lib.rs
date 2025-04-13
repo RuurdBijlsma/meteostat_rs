@@ -1,3 +1,5 @@
-pub mod get_hourly;
-pub mod get_stations;
+mod meteostat;
+pub mod stations;
+pub mod types;
 mod utils;
+pub mod weather_data;
