@@ -13,34 +13,6 @@ fn bench(c: &mut Criterion) {
 
     let rt = Runtime::new().unwrap();
 
-    c.bench_function("[gm] get_hourly_frame", |b| {
-        b.iter(|| {
-            rt.block_on(async {
-                let _l = meteostat::get_hourly::get_hourly_lazy(black_box(station_str)).await.unwrap();
-            });
-        });
-    });
-
-    let lf = rt.block_on(async { meteostat::get_hourly::get_hourly_lazy(station_str).await.unwrap() });
-
-    c.bench_function("[gm] get_hourly_from_df", |b| {
-        b.iter(|| {
-            rt.block_on(async {
-                meteostat::get_hourly::get_hourly_from_df(black_box(lf.clone()), black_box(utc)).unwrap();
-            });
-        });
-    });
-
-    c.bench_function("[gm] get_hourly_from_station", |b| {
-        b.iter(|| {
-            rt.block_on(async {
-                meteostat::get_hourly::get_hourly_from_station(black_box(station_str), black_box(utc))
-                    .await
-                    .unwrap();
-            });
-        });
-    });
-
     c.bench_function("[lazy] get_hourly_frame", |b| {
         b.iter(|| {
             rt.block_on(async {
