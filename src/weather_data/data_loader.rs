@@ -1,5 +1,5 @@
 use crate::utils::get_cache_dir;
-use crate::weather_data::weather_data_error::{Result, WeatherDataError};
+use crate::weather_data::weather_data_error::{WeatherDataError};
 use async_compression::tokio::bufread::GzipDecoder;
 use futures_util::TryStreamExt;
 use log::warn;
@@ -19,7 +19,7 @@ use crate::types::data_source::DataSourceType;
 pub async fn load_dataframe_for_station(
     data_type: DataSourceType,
     station: &str,
-) -> Result<LazyFrame> {
+) -> Result<LazyFrame, WeatherDataError> {
     let cache_dir = get_cache_dir().map_err(WeatherDataError::CacheDirResolution)?;
     let cache_filename = format!("{}{}.parquet", data_type.cache_file_prefix(), station);
     let parquet_path = cache_dir.join(cache_filename);
@@ -60,7 +60,7 @@ async fn download_gzipped_csv(
     client: &Client,
     data_type: DataSourceType,
     station: &str,
-) -> Result<Vec<u8>> {
+) -> Result<Vec<u8>, WeatherDataError> {
     let url = format!(
         "https://bulk.meteostat.net/v2/{}/{}.csv.gz",
         data_type.path_segment(),
@@ -100,7 +100,7 @@ async fn download_gzipped_csv(
 }
 
 /// Parses raw CSV bytes (without header) into a DataFrame using a blocking task.
-async fn parse_csv_bytes(bytes: Vec<u8>, station: &str) -> Result<DataFrame> {
+async fn parse_csv_bytes(bytes: Vec<u8>, station: &str) -> Result<DataFrame, WeatherDataError> {
     let station_owned = station.to_string();
     task::spawn_blocking(move || {
         let mut temp_file = NamedTempFile::new().map_err(|e| WeatherDataError::CsvReadIo {
@@ -130,7 +130,7 @@ async fn parse_csv_bytes(bytes: Vec<u8>, station: &str) -> Result<DataFrame> {
 }
 
 /// Writes a DataFrame to a Parquet file asynchronously using spawn_blocking.
-async fn write_dataframe_to_parquet(mut df: DataFrame, path: &Path) -> Result<()> {
+async fn write_dataframe_to_parquet(mut df: DataFrame, path: &Path) -> Result<(), WeatherDataError> {
     let path_buf = path.to_path_buf();
     task::spawn_blocking(move || {
         let file = std::fs::File::create(&path_buf)

@@ -1,7 +1,6 @@
-// src/weather_data/errors.rs (or similar path)
 use std::path::PathBuf;
 use thiserror::Error;
-use chrono::NaiveDate; // Import NaiveDate
+use chrono::NaiveDate;
 
 #[derive(Debug, Error)]
 pub enum WeatherDataError {
@@ -60,6 +59,3 @@ pub enum WeatherDataError {
     #[error("Required column '{0}' not found in DataFrame")]
     ColumnNotFound(String),
 }
-
-// Define a specific Result type alias for convenience within this module
-pub type Result<T, E = WeatherDataError> = std::result::Result<T, E>;

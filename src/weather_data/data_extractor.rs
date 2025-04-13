@@ -1,4 +1,4 @@
-use crate::weather_data::weather_data_error::{Result, WeatherDataError};
+use crate::weather_data::weather_data_error::{WeatherDataError};
 use chrono::{DateTime, NaiveDate, Timelike, Utc};
 use polars::prelude::*;
 use std::convert::TryFrom;
@@ -8,10 +8,7 @@ use crate::types::weather_data::climate::ClimateNormalInfo;
 use crate::types::weather_data::daily::DailyWeatherInfo;
 use crate::types::weather_data::hourly::HourlyWeatherInfo;
 use crate::types::weather_data::monthly::MonthlyWeatherInfo;
-// For get_opt_int
 
-// --- Helper functions to extract optional values from Series ---
-// (Keep get_opt_int, get_opt_float, get_opt_condition - they are reusable)
 fn get_opt_int<T>(series: &Column, idx: usize) -> Option<T>
 where
     T: TryFrom<i64>, // Changed from Column to Series
@@ -22,10 +19,10 @@ where
         .and_then(|ca| ca.get(idx))
         .and_then(|val| val.try_into().ok())
 }
-fn get_opt_float(series: &Column, idx: usize) -> Option<f64> { // Changed from Column to Series
+fn get_opt_float(series: &Column, idx: usize) -> Option<f64> { 
     series.f64().ok().and_then(|ca| ca.get(idx))
 }
-fn get_opt_condition(series: &Column, idx: usize) -> Option<WeatherCondition> { // Changed from Column to Series
+fn get_opt_condition(series: &Column, idx: usize) -> Option<WeatherCondition> {
     // Handle potential string representations first if needed (though unlikely now)
     series
         .str()
@@ -51,7 +48,7 @@ pub fn extract_hourly_weather_from_dataframe(
     df: LazyFrame,
     station: &str,
     datetime: DateTime<Utc>,
-) -> Result<HourlyWeatherInfo> {
+) -> Result<HourlyWeatherInfo, WeatherDataError> {
     let date_naive = datetime.date_naive();
     let date_string = date_naive.format("%Y-%m-%d").to_string();
     let hour_u32 = datetime.hour();
@@ -116,7 +113,7 @@ pub fn extract_daily_weather_from_dataframe(
     df: LazyFrame,
     station: &str,
     date: NaiveDate,
-) -> Result<DailyWeatherInfo> {
+) -> Result<DailyWeatherInfo, WeatherDataError> {
     let date_string = date.format("%Y-%m-%d").to_string();
 
     let renamed_df = rename_columns(df, DataSourceType::Daily);
@@ -161,7 +158,7 @@ pub fn extract_monthly_weather_from_dataframe(
     station: &str,
     year: i32,
     month: u32,
-) -> Result<MonthlyWeatherInfo> {
+) -> Result<MonthlyWeatherInfo, WeatherDataError> {
     let year_i64 = year as i64; // Polars needs i64 for literal typically
     let month_i64 = month as i64;
 
@@ -210,7 +207,7 @@ pub fn extract_climate_normal_from_dataframe(
     start_year: i32,
     end_year: i32,
     month: u32,
-) -> Result<ClimateNormalInfo> {
+) -> Result<ClimateNormalInfo, WeatherDataError> {
     let start_year_i64 = start_year as i64;
     let end_year_i64 = end_year as i64;
     let month_i64 = month as i64;

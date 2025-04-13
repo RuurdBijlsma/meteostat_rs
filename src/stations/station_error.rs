@@ -44,5 +44,3 @@ pub enum LocateStationError {
     #[error("Background task failed to complete")]
     TaskJoin(#[from] tokio::task::JoinError),
 }
-
-pub type Result<T, E = LocateStationError> = std::result::Result<T, E>;

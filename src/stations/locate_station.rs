@@ -1,4 +1,4 @@
-use crate::stations::station_error::{LocateStationError, Result};
+use crate::stations::station_error::{LocateStationError};
 use crate::types::station::Station;
 use crate::utils::{ensure_cache_dir_exists, get_cache_dir};
 use async_compression::tokio::bufread::GzipDecoder;
@@ -24,7 +24,7 @@ pub struct StationLocator {
 
 impl StationLocator {
     // Update the return type to use the custom Result
-    pub async fn init() -> Result<Self> {
+    pub async fn init() -> Result<Self, LocateStationError> {
         let cache_path = Self::get_cache_path()?;
 
         let stations: Vec<Station>;
@@ -47,7 +47,7 @@ impl StationLocator {
     }
 
     // Update the return type
-    fn get_cached_stations(cache_path: &Path) -> Result<Vec<Station>> {
+    fn get_cached_stations(cache_path: &Path) -> Result<Vec<Station>, LocateStationError> {
         let bytes = std::fs::read(cache_path).map_err(|e| {
             LocateStationError::CacheRead(cache_path.to_path_buf(), e) // Add context
         })?;
@@ -62,7 +62,7 @@ impl StationLocator {
     }
 
     // Update the return type
-    async fn fetch_stations() -> Result<Vec<Station>> {
+    async fn fetch_stations() -> Result<Vec<Station>, LocateStationError> {
         let client = Client::new();
         let response = client
             .get(DATA_URL)
