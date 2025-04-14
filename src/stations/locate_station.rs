@@ -8,7 +8,7 @@ use haversine::{distance, Location as HaversineLocation, Units};
 use reqwest::Client;
 use rstar::RTree;
 use std::io::{self};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use tokio::io::{AsyncReadExt, BufReader};
 use tokio_util::io::StreamReader;
 
@@ -19,7 +19,6 @@ const BINCODE_CONFIG: Configuration<LittleEndian, Fixint> =
 
 pub struct StationLocator {
     rtree: RTree<Station>,
-    cache_file: PathBuf,
 }
 
 impl StationLocator {
@@ -42,7 +41,7 @@ impl StationLocator {
         }
 
         let rtree = RTree::bulk_load(stations);
-        Ok(StationLocator { rtree, cache_file })
+        Ok(StationLocator { rtree })
     }
 
     // Update the return type

@@ -1,21 +1,21 @@
 use std::fmt;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum DataSourceType {
+pub enum DataSource {
     Hourly,
     Daily,
     Monthly,
     Normals,
 }
 
-impl DataSourceType {
+impl DataSource {
     /// Returns the path segment for the URL and cache file name.
     pub fn path_segment(&self) -> &'static str {
         match self {
-            DataSourceType::Hourly => "hourly",
-            DataSourceType::Daily => "daily",
-            DataSourceType::Monthly => "monthly",
-            DataSourceType::Normals => "normals",
+            DataSource::Hourly => "hourly",
+            DataSource::Daily => "daily",
+            DataSource::Monthly => "monthly",
+            DataSource::Normals => "normals",
         }
     }
 
@@ -28,19 +28,19 @@ impl DataSourceType {
     /// Must match the Meteostat documentation ORDER for each type.
     pub fn get_schema_column_names(&self) -> Vec<&'static str> {
         match self {
-            DataSourceType::Hourly => vec![
+            DataSource::Hourly => vec![
                 "date", "hour", "temp", "dwpt", "rhum", "prcp", "snow", "wdir", "wspd", "wpgt",
                 "pres", "tsun", "coco",
             ],
-            DataSourceType::Daily => vec![
+            DataSource::Daily => vec![
                 "date", "tavg", "tmin", "tmax", "prcp", "snow", "wdir", "wspd", "wpgt", "pres",
                 "tsun",
             ],
-            DataSourceType::Monthly => vec![
+            DataSource::Monthly => vec![
                 "year", "month", "tavg", "tmin", "tmax", "prcp", "wspd",
                 "pres", "tsun",
             ],
-            DataSourceType::Normals => vec![
+            DataSource::Normals => vec![
                 "start_year",
                 "end_year",
                 "month",
@@ -55,7 +55,7 @@ impl DataSourceType {
     }
 }
 
-impl fmt::Display for DataSourceType {
+impl fmt::Display for DataSource {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.path_segment())
     }

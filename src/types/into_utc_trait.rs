@@ -1,4 +1,4 @@
-use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc, Local, TimeZone};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc, Local, TimeZone, FixedOffset};
 
 pub trait IntoUtcDateTime {
     fn into_utc(self) -> DateTime<Utc>;
@@ -25,5 +25,11 @@ impl IntoUtcDateTime for DateTime<Local> {
 impl IntoUtcDateTime for DateTime<Utc> {
     fn into_utc(self) -> DateTime<Utc> {
         self
+    }
+}
+
+impl IntoUtcDateTime for DateTime<FixedOffset> {
+    fn into_utc(self) -> DateTime<Utc> {
+        self.with_timezone(&Utc)
     }
 }

@@ -1,4 +1,4 @@
-use crate::types::data_source::DataSourceType; // Make sure this is imported
+use crate::types::data_source::DataSource;
 use crate::weather_data::error::WeatherDataError;
 use async_compression::tokio::bufread::GzipDecoder;
 use futures_util::TryStreamExt;
@@ -32,7 +32,7 @@ impl WeatherDataLoader {
 
     pub async fn get_frame(
         &self,
-        data_type: DataSourceType,
+        data_type: DataSource,
         station: &str,
     ) -> Result<LazyFrame, WeatherDataError> {
         let cache_filename = format!("{}{}.parquet", data_type.cache_file_prefix(), station);
@@ -52,7 +52,7 @@ impl WeatherDataLoader {
 
             let raw_bytes = self.download(data_type, &station_id).await?;
             // Make df mutable here
-            let mut df = Self::csv_to_dataframe(raw_bytes, &station_id, data_type).await?;
+            let df = Self::csv_to_dataframe(raw_bytes, &station_id, data_type).await?;
 
             fs::create_dir_all(&self.cache_dir)
                 .await
@@ -73,7 +73,7 @@ impl WeatherDataLoader {
     /// Downloads and decompresses data for a specific type and station.
     async fn download(
         &self,
-        data_type: DataSourceType,
+        data_type: DataSource,
         station: &str,
     ) -> Result<Vec<u8>, WeatherDataError> {
         let url = format!(
@@ -130,7 +130,7 @@ impl WeatherDataLoader {
     async fn csv_to_dataframe(
         bytes: Vec<u8>,
         station: &str,
-        data_type: DataSourceType,
+        data_type: DataSource,
     ) -> Result<DataFrame, WeatherDataError> {
         let station_owned = station.to_string();
         let schema_names = data_type.get_schema_column_names();

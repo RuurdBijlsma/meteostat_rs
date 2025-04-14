@@ -1,8 +1,8 @@
-use std::path::PathBuf;
-use thiserror::Error;
+use crate::types::data_source::DataSource;
 use chrono::NaiveDate;
 use polars::error::PolarsError;
-use crate::types::data_source::DataSourceType;
+use std::path::PathBuf;
+use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum WeatherDataError {
@@ -19,10 +19,10 @@ pub enum WeatherDataError {
     #[error("I/O error writing parquet cache file '{0}'")]
     ParquetWriteIo(PathBuf, #[source] std::io::Error),
     #[error("Encoding error writing parquet cache file '{0}'")]
-    ParquetWritePolars(PathBuf, #[source] polars::error::PolarsError),
+    ParquetWritePolars(PathBuf, #[source] PolarsError),
 
     #[error("Failed to scan parquet cache file '{0}'")]
-    ParquetScan(PathBuf, #[source] polars::error::PolarsError),
+    ParquetScan(PathBuf, #[source] PolarsError),
 
     #[error("Network request failed for {0}")]
     NetworkRequest(String, #[source] reqwest::Error),
@@ -40,15 +40,23 @@ pub enum WeatherDataError {
 
     // Errors during CSV reading (inside blocking task)
     #[error("I/O error processing CSV data for station '{station}'")]
-    CsvReadIo { station: String, #[source] source: std::io::Error },
+    CsvReadIo {
+        station: String,
+        #[source]
+        source: std::io::Error,
+    },
     #[error("Parsing error processing CSV data for station '{station}'")]
-    CsvReadPolars { station: String, #[source] source: polars::error::PolarsError },
+    CsvReadPolars {
+        station: String,
+        #[source]
+        source: PolarsError,
+    },
 
     #[error("Background task failed to complete")]
     TaskJoin(#[from] tokio::task::JoinError),
 
-    #[error("Failed processing DataFrame: {0}")] // General Polars errors during DF ops
-    DataFrameProcessing(#[from] polars::error::PolarsError),
+    #[error("Failed processing DataFrame: {0}")]
+    DataFrameProcessing(#[from] PolarsError),
 
     // Specific error for when the requested data row isn't found
     #[error("No weather data found for station '{station}' at {date} {hour:02}:00")]
@@ -59,19 +67,32 @@ pub enum WeatherDataError {
     },
 
     #[error("Required column '{0}' not found in DataFrame")]
-    ColumnNotFound(String),
+    ColumnNotFound(String, #[source] PolarsError),
 
     #[error("CSV column count ({found}) does not match schema length ({expected}) for {data_type} data for station {station}")]
     SchemaMismatch {
         station: String,
-        data_type: DataSourceType,
+        data_type: DataSource,
         expected: usize,
         found: usize,
     },
 
     #[error("Failed to rename columns for station {station}: {source}")]
-    ColumnRenameError{
+    ColumnRenameError {
         station: String,
         source: PolarsError,
-    }
+    },
+
+    #[error("Polars operation failed for station {station}: {source}")]
+    PolarsError{
+        station: String,
+        #[source]
+        source: PolarsError,
+    },
+
+    #[error("Unexpected data state, station {station}: {message}")]
+    UnexpectedData{
+        message: String,
+        station: String,
+    },
 }
