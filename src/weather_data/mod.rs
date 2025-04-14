@@ -1,4 +1,4 @@
-pub mod weather_data_error;
-pub mod fetch;
+pub mod error;
+pub mod fetcher;
 pub mod data_loader;
 pub mod data_extractor;

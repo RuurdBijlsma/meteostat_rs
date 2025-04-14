@@ -1,6 +1,5 @@
-use crate::stations::station_error::{LocateStationError};
+use crate::stations::error::LocateStationError;
 use crate::types::station::Station;
-use crate::utils::{ensure_cache_dir_exists, get_cache_dir};
 use async_compression::tokio::bufread::GzipDecoder;
 use bincode;
 use bincode::config::{Configuration, Fixint, LittleEndian};
@@ -8,7 +7,7 @@ use futures_util::TryStreamExt;
 use haversine::{distance, Location as HaversineLocation, Units};
 use reqwest::Client;
 use rstar::RTree;
-use std::io::{self}; // Keep this for mapping stream errors
+use std::io::{self};
 use std::path::{Path, PathBuf};
 use tokio::io::{AsyncReadExt, BufReader};
 use tokio_util::io::StreamReader;
@@ -20,30 +19,30 @@ const BINCODE_CONFIG: Configuration<LittleEndian, Fixint> =
 
 pub struct StationLocator {
     rtree: RTree<Station>,
+    cache_file: PathBuf,
 }
 
 impl StationLocator {
-    // Update the return type to use the custom Result
-    pub async fn init() -> Result<Self, LocateStationError> {
-        let cache_path = Self::get_cache_path()?;
+    pub async fn new(cache_dir: &Path) -> Result<Self, LocateStationError> {
+        let cache_file = cache_dir.join(BINCODE_CACHE_FILE_NAME);
 
         let stations: Vec<Station>;
 
-        if cache_path.exists() {
+        if cache_file.exists() {
             // Read file contents in a blocking task
             // Clone cache_path before moving it into the closure
-            let path_clone = cache_path.clone();
+            let path_clone = cache_file.clone();
             stations = tokio::task::spawn_blocking(move || Self::get_cached_stations(&path_clone))
                 .await??; // First ? handles JoinError, second handles StationCacheError
         } else {
             println!("Cache file not found. Fetching from URL: {}", DATA_URL);
             stations = Self::fetch_stations().await?;
             // Clone stations before moving into the closure if needed later
-            Self::cache_stations(stations.clone(), &cache_path).await?;
+            Self::cache_stations(stations.clone(), &cache_file).await?;
         }
 
         let rtree = RTree::bulk_load(stations);
-        Ok(StationLocator { rtree })
+        Ok(StationLocator { rtree, cache_file })
     }
 
     // Update the return type
@@ -128,15 +127,6 @@ impl StationLocator {
     ) -> Result<(), LocateStationError> {
         let cache_start = std::time::Instant::now();
 
-        // Ensure parent dir exists, map potential io::Error
-        if let Some(parent) = cache_path.parent() {
-            // Assuming ensure_cache_dir_exists returns Result<(), std::io::Error>
-            ensure_cache_dir_exists(parent)
-                .await
-                .map_err(|e| LocateStationError::CacheDirCreation(parent.to_path_buf(), e))?;
-        }
-        // No else needed, if there's no parent, writing to root might fail later anyway
-
         // The closure now needs to return Result<Vec<u8>, StationCacheError>
         let bincode_data = tokio::task::spawn_blocking({
             move || {
@@ -161,39 +151,50 @@ impl StationLocator {
         Ok(())
     }
 
-    // Update the return type - assuming get_cache_dir returns Result<PathBuf, std::io::Error>
-    fn get_cache_path() -> Result<PathBuf, LocateStationError> {
-        get_cache_dir()
-            .map(|dir| dir.join(BINCODE_CACHE_FILE_NAME))
-            // Map the error from get_cache_dir
-            .map_err(LocateStationError::CacheDirResolution)
-        // If get_cache_dir returns a custom error handled by CacheUtilError:
-        // .map_err(StationCacheError::from)
-    }
-
-    /// Finds the N nearest stations to the given latitude and longitude.
+    /// Finds up to N nearest stations to the given latitude and longitude,
+    /// ensuring they are within a specified maximum distance (radius).
     /// Results are sorted by actual Haversine distance.
-    /// This function doesn't involve fallible operations needing the new error type.
-    pub fn query(&self, latitude: f64, longitude: f64, n_results: usize) -> Vec<(&Station, f64)> {
+    ///
+    /// # Arguments
+    /// * `latitude` - The latitude of the center point.
+    /// * `longitude` - The longitude of the center point.
+    /// * `n_results` - The maximum number of stations to return.
+    /// * `max_distance_km` - The maximum distance (radius) in kilometers from the center point.
+    ///                       Stations further than this will be excluded.
+    ///
+    /// # Returns
+    /// A vector of tuples, where each tuple contains a reference to a `Station`
+    /// and its calculated distance in kilometers. The vector is sorted by distance
+    /// and contains at most `n_results` elements, all within `max_distance_km`.
+    pub fn query(
+        &self,
+        latitude: f64,
+        longitude: f64,
+        n_results: usize,
+        max_distance_km: f64, // New parameter
+    ) -> Vec<(&Station, f64)> {
         if n_results == 0 {
             return vec![];
         }
         let query_point = [latitude, longitude];
 
-        // 1. Perform nearest neighbor search using R-Tree (uses squared Euclidean).
-        // R-Tree nearest_neighbor_iter doesn't typically return errors in this usage.
+        // 1. Perform nearest neighbor search using R-Tree.
+        // We still use `take(n_results)` as an initial heuristic filter based on the
+        // R-tree's distance metric. This avoids calculating Haversine for potentially
+        // thousands of points if the tree is large and max_distance_km is generous.
+        // If n_results is large and max_distance_km small, this might fetch
+        // candidates that are later filtered out.
         let candidates: Vec<&Station> = self
             .rtree
             .nearest_neighbor_iter(&query_point)
-            .take(n_results)
+            .take(n_results) // Get up to n candidates initially
             .collect();
 
         if candidates.is_empty() {
             return vec![];
         }
 
-        // 2. Calculate precise Haversine distance for the candidates.
-        // Haversine distance calculation doesn't return errors.
+        // 2. Calculate precise Haversine distance for the candidates and filter by max_distance_km.
         let mut stations_with_dist: Vec<(&Station, f64)> = candidates
             .into_iter()
             .map(|station| {
@@ -201,20 +202,26 @@ impl StationLocator {
                     latitude: station.location.latitude,
                     longitude: station.location.longitude,
                 };
-                let query_loc = HaversineLocation {
-                    latitude,
-                    longitude,
-                };
-                let dist_km = distance(query_loc, station_loc, Units::Kilometers);
+                let dist_km = distance(
+                    HaversineLocation {
+                        latitude,
+                        longitude,
+                    },
+                    station_loc,
+                    Units::Kilometers,
+                );
                 (station, dist_km)
             })
+            // Filter out stations beyond the maximum allowed distance
+            .filter(|(_, dist_km)| *dist_km <= max_distance_km)
             .collect();
 
-        // 3. Sort the final small list by the calculated Haversine distance.
-        // Sorting doesn't return errors, unwrap_or handles potential NaN comparison edge cases.
+        // 3. Sort the remaining (filtered) list by the calculated Haversine distance.
         stations_with_dist
             .sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
 
+        // 4. The list is already implicitly capped at n_results (due to the initial .take())
+        //    and filtered by distance. Return the result.
         stations_with_dist
     }
 }

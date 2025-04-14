@@ -1,6 +1,7 @@
 use crate::error::MeteostatError;
+use crate::stations::error::LocateStationError;
 use crate::stations::locate_station::StationLocator;
-use crate::utils::get_cache_dir;
+use crate::utils::{ensure_cache_dir_exists, get_cache_dir};
 use chrono::Duration;
 use std::path::PathBuf;
 
@@ -63,6 +64,10 @@ impl MeteostatBuilder {
             Some(p) => p,
             None => get_cache_dir().map_err(MeteostatError::CacheDirResolution)?,
         };
+        ensure_cache_dir_exists(&cache_folder)
+            .await
+            .map_err(|e| LocateStationError::CacheDirCreation(cache_folder.clone(), e))?;
+
         // let station_locator = StationLocator::init_with_options(
         //     self.max_distance_km,
         //     self.max_time_diff_hours,
@@ -70,6 +75,7 @@ impl MeteostatBuilder {
         //     self.refresh_cache_after,
         //     self.combine_sources,
         // ).await?;
+        let station_locator = StationLocator::new(&cache_folder).await?;
 
         Ok(Meteostat { station_locator })
     }

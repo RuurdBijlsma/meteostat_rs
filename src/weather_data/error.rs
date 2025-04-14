@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 use thiserror::Error;
 use chrono::NaiveDate;
+use polars::error::PolarsError;
+use crate::types::data_source::DataSourceType;
 
 #[derive(Debug, Error)]
 pub enum WeatherDataError {
@@ -58,4 +60,18 @@ pub enum WeatherDataError {
 
     #[error("Required column '{0}' not found in DataFrame")]
     ColumnNotFound(String),
+
+    #[error("CSV column count ({found}) does not match schema length ({expected}) for {data_type} data for station {station}")]
+    SchemaMismatch {
+        station: String,
+        data_type: DataSourceType,
+        expected: usize,
+        found: usize,
+    },
+
+    #[error("Failed to rename columns for station {station}: {source}")]
+    ColumnRenameError{
+        station: String,
+        source: PolarsError,
+    }
 }

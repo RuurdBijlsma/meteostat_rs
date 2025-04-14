@@ -1,6 +1,6 @@
 use std::path::PathBuf;
-use crate::stations::station_error::LocateStationError;
-use crate::weather_data::weather_data_error::WeatherDataError;
+use crate::stations::error::LocateStationError;
+use crate::weather_data::error::WeatherDataError;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
