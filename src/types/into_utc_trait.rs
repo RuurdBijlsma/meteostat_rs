@@ -1,13 +1,7 @@
-use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc, Local, TimeZone, FixedOffset};
+use chrono::{DateTime, FixedOffset, Local, NaiveDateTime, TimeZone, Utc};
 
 pub trait IntoUtcDateTime {
     fn into_utc(self) -> DateTime<Utc>;
-}
-
-impl IntoUtcDateTime for NaiveDate {
-    fn into_utc(self) -> DateTime<Utc> {
-        Utc.from_utc_datetime(&self.and_hms_opt(0, 0, 0).unwrap())
-    }
 }
 
 impl IntoUtcDateTime for NaiveDateTime {
