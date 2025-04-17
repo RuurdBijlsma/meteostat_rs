@@ -1,7 +1,7 @@
 use chrono::{DateTime, NaiveDate, Utc};
 use meteostat::error::MeteostatError;
 use meteostat::meteostat::MeteostatBuilder;
-use meteostat::types::bitflags::hourly::RequiredWeatherField;
+use meteostat::types::bitflags::hourly::RequiredHourlyField;
 
 #[tokio::main]
 async fn main() -> Result<(), MeteostatError> {
@@ -22,7 +22,7 @@ async fn main() -> Result<(), MeteostatError> {
     let basic_data = meteostat.get_hourly(lat, lon, utc).await?;
     dbg!(basic_data);
 
-    let required_fields = RequiredWeatherField::TEMPERATURE | RequiredWeatherField::PRECIPITATION;
+    let required_fields = RequiredHourlyField::TEMPERATURE | RequiredHourlyField::PRECIPITATION;
     let combined_data = meteostat
         .get_hourly_combined(lat, lon, utc, required_fields)
         .await?;

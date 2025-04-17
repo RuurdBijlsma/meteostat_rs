@@ -1,6 +1,5 @@
-* make common cache location definition
-* get weather info by datetime
-let use say that 1 hour difference is ok? 
+* get range of info and return dataframe
+* copy tests from python meteostat https://github.com/meteostat/meteostat-python/blob/master/tests/e2e/test_daily.py
 * refresh cache possibility
 * overdreven veel comments weghalen
-* place cache dir creation in the right spot (meteostat)
+* expand get_stations to only get stations that have info for that datetime (is in the json/binfile)

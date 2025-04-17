@@ -16,7 +16,7 @@ pub enum MeteostatError {
     CacheDirCreation(PathBuf, #[source] std::io::Error),
 
     #[error("Failed to determine cache directory")]
-    CacheDirResolution(#[source] std::io::Error),
+    CacheDirResolution(#[from] std::io::Error),
 
     #[error("No {granularity} data found for datetime: {datetime} and position: {latitude}, {longitude}.")]
     NoDataFound{datetime: String, latitude: f64, longitude: f64, granularity: DataSource},

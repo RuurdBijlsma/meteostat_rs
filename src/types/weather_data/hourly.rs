@@ -1,6 +1,6 @@
 // In the file where HourlyWeatherInfo is defined
 use chrono::NaiveDate;
-use crate::types::bitflags::hourly::RequiredWeatherField;
+use crate::types::bitflags::hourly::RequiredHourlyField;
 use crate::types::weather_condition::WeatherCondition;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -37,18 +37,18 @@ impl HourlyWeatherInfo {
     }
 
     /// Checks if all fields specified in `required` are `Some`.
-    pub fn has_required_fields(&self, required: RequiredWeatherField) -> bool {
-        if required.contains(RequiredWeatherField::TEMPERATURE) && self.temperature.is_none() { return false; }
-        if required.contains(RequiredWeatherField::DEW_POINT) && self.dew_point.is_none() { return false; }
-        if required.contains(RequiredWeatherField::RELATIVE_HUMIDITY) && self.relative_humidity.is_none() { return false; }
-        if required.contains(RequiredWeatherField::PRECIPITATION) && self.precipitation.is_none() { return false; }
-        if required.contains(RequiredWeatherField::SNOW) && self.snow.is_none() { return false; } // Adjust if snow=None is acceptable
-        if required.contains(RequiredWeatherField::WIND_DIRECTION) && self.wind_direction.is_none() { return false; }
-        if required.contains(RequiredWeatherField::WIND_SPEED) && self.wind_speed.is_none() { return false; }
-        if required.contains(RequiredWeatherField::PEAK_WIND_GUST) && self.peak_wind_gust.is_none() { return false; }
-        if required.contains(RequiredWeatherField::PRESSURE) && self.pressure.is_none() { return false; }
-        if required.contains(RequiredWeatherField::SUNSHINE) && self.sunshine.is_none() { return false; }
-        if required.contains(RequiredWeatherField::CONDITION) && self.condition.is_none() { return false; }
+    pub fn has_required_fields(&self, required: RequiredHourlyField) -> bool {
+        if required.contains(RequiredHourlyField::TEMPERATURE) && self.temperature.is_none() { return false; }
+        if required.contains(RequiredHourlyField::DEW_POINT) && self.dew_point.is_none() { return false; }
+        if required.contains(RequiredHourlyField::RELATIVE_HUMIDITY) && self.relative_humidity.is_none() { return false; }
+        if required.contains(RequiredHourlyField::PRECIPITATION) && self.precipitation.is_none() { return false; }
+        if required.contains(RequiredHourlyField::SNOW) && self.snow.is_none() { return false; } // Adjust if snow=None is acceptable
+        if required.contains(RequiredHourlyField::WIND_DIRECTION) && self.wind_direction.is_none() { return false; }
+        if required.contains(RequiredHourlyField::WIND_SPEED) && self.wind_speed.is_none() { return false; }
+        if required.contains(RequiredHourlyField::PEAK_WIND_GUST) && self.peak_wind_gust.is_none() { return false; }
+        if required.contains(RequiredHourlyField::PRESSURE) && self.pressure.is_none() { return false; }
+        if required.contains(RequiredHourlyField::SUNSHINE) && self.sunshine.is_none() { return false; }
+        if required.contains(RequiredHourlyField::CONDITION) && self.condition.is_none() { return false; }
         true // All required fields were present
     }
 }

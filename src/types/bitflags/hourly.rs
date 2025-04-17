@@ -4,7 +4,7 @@ bitflags! {
     /// Flags to specify which fields are required when fetching hourly weather data.
     /// Used with `Meteostat::get_hourly`.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)] // Add necessary derives
-    pub struct RequiredWeatherField: u32 {
+    pub struct RequiredHourlyField: u32 {
         const TEMPERATURE         = 1 << 0;
         const DEW_POINT           = 1 << 1;
         const RELATIVE_HUMIDITY   = 1 << 2;
@@ -36,8 +36,8 @@ bitflags! {
 }
 
 // Optional: Provide a default if desired, e.g., requiring all fields by default.
-impl Default for RequiredWeatherField {
+impl Default for RequiredHourlyField {
     fn default() -> Self {
-        RequiredWeatherField::ALL
+        RequiredHourlyField::ALL
     }
 }
