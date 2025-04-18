@@ -10,7 +10,7 @@ use crate::types::weather_data::hourly::HourlyWeatherInfo;
 use crate::types::weather_data::monthly::MonthlyWeatherInfo;
 use crate::utils::{ensure_cache_dir_exists, get_cache_dir};
 use crate::weather_data::error::WeatherDataError;
-use crate::weather_data::fetcher::WeatherFetcher;
+use crate::weather_data::frame_fetcher::FrameFetcher;
 use chrono::NaiveDate;
 use std::path::PathBuf;
 use crate::types::bitflags::climate::RequiredClimateField;
@@ -18,7 +18,7 @@ use crate::types::weather_data::climate::ClimateNormalInfo;
 
 pub struct Meteostat {
     station_locator: StationLocator,
-    weather_fetcher: WeatherFetcher,
+    weather_fetcher: FrameFetcher,
     max_distance_km: f64,
     station_check_limit: usize,
 }
@@ -665,7 +665,7 @@ impl MeteostatBuilder {
             .map_err(|e| MeteostatError::CacheDirCreation(cache_folder.clone(), e))?;
 
         let station_locator = StationLocator::new(&cache_folder).await?;
-        let fetcher = WeatherFetcher::new(&cache_folder);
+        let fetcher = FrameFetcher::new(&cache_folder);
 
         Ok(Meteostat {
             station_locator,

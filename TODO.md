@@ -3,3 +3,11 @@
 * refresh cache possibility
 * overdreven veel comments weghalen
 * expand get_stations to only get stations that have info for that datetime (is in the json/binfile)
+
+frame functions i want
+
+* Get frame per latlon (date range or just datetime)
+    * combine stations into one frame option (sorted by distance)
+* Get station(s) per latlon (date range or just datetime)
+* Get frame per station
+* helper functions to turn frame output into rust structs or vec of rust structs (trait TryFromPolarsRow)

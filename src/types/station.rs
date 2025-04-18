@@ -1,7 +1,7 @@
-use std::collections::HashMap;
 use chrono::NaiveDate;
 use rstar::{PointDistance, RTreeObject, AABB};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 // --- Data Structures ---
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -16,6 +16,7 @@ pub struct Station {
     pub location: Location,
     pub inventory: Inventory,
 }
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Inventory {
     pub daily: DateRange,
@@ -24,22 +25,26 @@ pub struct Inventory {
     pub monthly: YearRange,
     pub normals: YearRange,
 }
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DateRange {
     pub start: Option<NaiveDate>,
     pub end: Option<NaiveDate>,
 }
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct YearRange {
     pub start: Option<i32>,
     pub end: Option<i32>,
 }
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Identifiers {
     pub national: Option<String>,
     pub wmo: Option<String>,
     pub icao: Option<String>,
 }
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Location {
     pub latitude: f64,

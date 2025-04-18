@@ -2,7 +2,7 @@ use chrono::{DateTime, NaiveDate, Utc};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use meteostat::stations::locate_station::StationLocator;
 use meteostat::utils::get_cache_dir;
-use meteostat::weather_data::fetcher::WeatherFetcher;
+use meteostat::weather_data::frame_fetcher::FrameFetcher;
 use tokio::runtime::Runtime;
 
 fn bench(c: &mut Criterion) {
@@ -16,7 +16,7 @@ fn bench(c: &mut Criterion) {
     let cache_dir = get_cache_dir().unwrap();
 
     let rt = Runtime::new().unwrap();
-    let fetcher = WeatherFetcher::new(&cache_dir);
+    let fetcher = FrameFetcher::new(&cache_dir);
 
     c.bench_function("fetcher.hourly", |b| {
         b.iter(|| {
