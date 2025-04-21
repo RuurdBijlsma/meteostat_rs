@@ -1,7 +1,7 @@
 use crate::types::into_utc_trait::IntoUtcDateTime;
 use chrono::{NaiveDate, Utc};
 use polars::prelude::{
-    col, duration, lit, DataType, DurationArgs, LazyFrame, PolarsError, StrptimeOptions, TimeUnit,
+    col, duration, lit, DataType, DurationArgs, LazyFrame, StrptimeOptions, TimeUnit,
 };
 
 pub trait MeteostatFrameFilterExt {
@@ -84,17 +84,17 @@ impl MeteostatFrameFilterExt for LazyFrame {
                     cache: true,
                 },
                 lit("raise"),
-            ) 
-            .cast(DataType::Datetime(TimeUnit::Milliseconds, None)) 
-            + duration(DurationArgs::new().with_hours(col("hour"))); 
+            )
+            .cast(DataType::Datetime(TimeUnit::Milliseconds, None))
+            + duration(DurationArgs::new().with_hours(col("hour")));
 
         // Since strptime no longer returns Result, the Ok() wrapper is removed.
         // The function now returns LazyFrame directly.
         self.filter(
             datetime_expr
                 .clone()
-                .gt_eq(lit(start_naive)) 
-                .and(datetime_expr.lt_eq(lit(end_naive))), 
+                .gt_eq(lit(start_naive))
+                .and(datetime_expr.lt_eq(lit(end_naive))),
         )
     }
 
@@ -110,7 +110,7 @@ impl MeteostatFrameFilterExt for LazyFrame {
                 cache: true,
             },
             lit("raise"),
-        ); 
+        );
 
         // Since strptime no longer returns Result, the Ok() wrapper is removed.
         // The function now returns LazyFrame directly.
