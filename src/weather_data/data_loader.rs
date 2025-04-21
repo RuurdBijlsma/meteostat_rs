@@ -1,4 +1,4 @@
-use crate::types::data_source::DataSource;
+use crate::types::data_source::Frequency;
 use crate::weather_data::error::WeatherDataError;
 use async_compression::tokio::bufread::GzipDecoder;
 use futures_util::TryStreamExt;
@@ -13,6 +13,7 @@ use tokio::io::AsyncReadExt;
 use tokio::{fs, task};
 use tokio_util::io::StreamReader;
 
+#[derive(Debug, Clone)]
 pub struct WeatherDataLoader {
     cache_dir: PathBuf,
     download_client: Client,
@@ -32,7 +33,7 @@ impl WeatherDataLoader {
 
     pub async fn get_frame(
         &self,
-        data_type: DataSource,
+        data_type: Frequency,
         station: &str,
     ) -> Result<LazyFrame, WeatherDataError> {
         let cache_filename = format!("{}{}.parquet", data_type.cache_file_prefix(), station);
@@ -73,7 +74,7 @@ impl WeatherDataLoader {
     /// Downloads and decompresses data for a specific type and station.
     async fn download(
         &self,
-        data_type: DataSource,
+        data_type: Frequency,
         station: &str,
     ) -> Result<Vec<u8>, WeatherDataError> {
         let url = format!(
@@ -130,7 +131,7 @@ impl WeatherDataLoader {
     async fn csv_to_dataframe(
         bytes: Vec<u8>,
         station: &str,
-        data_type: DataSource,
+        data_type: Frequency,
     ) -> Result<DataFrame, WeatherDataError> {
         let station_owned = station.to_string();
         let schema_names = data_type.get_schema_column_names();

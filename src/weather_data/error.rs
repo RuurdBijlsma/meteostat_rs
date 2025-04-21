@@ -1,4 +1,4 @@
-use crate::types::data_source::DataSource;
+use crate::types::data_source::Frequency;
 use chrono::NaiveDate;
 use polars::error::PolarsError;
 use std::path::PathBuf;
@@ -72,7 +72,7 @@ pub enum WeatherDataError {
     #[error("CSV column count ({found}) does not match schema length ({expected}) for {data_type} data for station {station}")]
     SchemaMismatch {
         station: String,
-        data_type: DataSource,
+        data_type: Frequency,
         expected: usize,
         found: usize,
     },

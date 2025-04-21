@@ -1,21 +1,21 @@
 use std::fmt;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum DataSource {
+pub enum Frequency {
     Hourly,
     Daily,
     Monthly,
-    Normals,
+    Climate,
 }
 
-impl DataSource {
+impl Frequency {
     /// Returns the path segment for the URL and cache file name.
     pub fn path_segment(&self) -> &'static str {
         match self {
-            DataSource::Hourly => "hourly",
-            DataSource::Daily => "daily",
-            DataSource::Monthly => "monthly",
-            DataSource::Normals => "normals",
+            Frequency::Hourly => "hourly",
+            Frequency::Daily => "daily",
+            Frequency::Monthly => "monthly",
+            Frequency::Climate => "normals",
         }
     }
 
@@ -28,19 +28,19 @@ impl DataSource {
     /// Must match the Meteostat documentation ORDER for each type.
     pub fn get_schema_column_names(&self) -> Vec<&'static str> {
         match self {
-            DataSource::Hourly => vec![
+            Frequency::Hourly => vec![
                 "date", "hour", "temp", "dwpt", "rhum", "prcp", "snow", "wdir", "wspd", "wpgt",
                 "pres", "tsun", "coco",
             ],
-            DataSource::Daily => vec![
+            Frequency::Daily => vec![
                 "date", "tavg", "tmin", "tmax", "prcp", "snow", "wdir", "wspd", "wpgt", "pres",
                 "tsun",
             ],
-            DataSource::Monthly => vec![
+            Frequency::Monthly => vec![
                 "year", "month", "tavg", "tmin", "tmax", "prcp", "wspd",
                 "pres", "tsun",
             ],
-            DataSource::Normals => vec![
+            Frequency::Climate => vec![
                 "start_year",
                 "end_year",
                 "month",
@@ -55,7 +55,7 @@ impl DataSource {
     }
 }
 
-impl fmt::Display for DataSource {
+impl fmt::Display for Frequency {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.path_segment())
     }

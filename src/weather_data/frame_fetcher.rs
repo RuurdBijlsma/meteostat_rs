@@ -1,4 +1,4 @@
-use crate::types::data_source::DataSource;
+use crate::types::data_source::Frequency;
 use crate::weather_data::data_loader::WeatherDataLoader;
 use crate::weather_data::error::WeatherDataError;
 use polars::prelude::LazyFrame;
@@ -8,7 +8,7 @@ use tokio::sync::Mutex;
 
 pub struct FrameFetcher {
     loader: WeatherDataLoader,
-    lazyframe_cache: Mutex<HashMap<(String, DataSource), LazyFrame>>,
+    lazyframe_cache: Mutex<HashMap<(String, Frequency), LazyFrame>>,
 }
 
 impl FrameFetcher {
@@ -20,10 +20,10 @@ impl FrameFetcher {
     }
 
     /// Gets a DataFrameExtractor for a given station and data source, using the cache if possible.
-    async fn get_cache_lazyframe(
+    pub async fn get_cache_lazyframe(
         &self,
         station: &str,
-        data_source: DataSource,
+        data_source: Frequency,
     ) -> Result<LazyFrame, WeatherDataError> {
         let key = (station.to_string(), data_source);
 

@@ -17,6 +17,7 @@ const BINCODE_CACHE_FILE_NAME: &str = "stations_lite.bin";
 const BINCODE_CONFIG: Configuration<LittleEndian, Fixint> =
     bincode::config::standard().with_fixed_int_encoding();
 
+#[derive(Debug, Clone)]
 pub struct StationLocator {
     rtree: RTree<Station>,
 }
