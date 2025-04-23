@@ -107,7 +107,6 @@ fn bench(c: &mut Criterion) {
     c.bench_function("meteostat.from_location.hourly+filter+collect", |b| {
         b.iter(|| {
             rt.block_on(async {
-                let meteostat = Meteostat::new().await.unwrap();
                 let start_utc = Utc.with_ymd_and_hms(2023, 10, 26, 0, 0, 0).unwrap();
                 let end_utc = Utc.with_ymd_and_hms(2023, 10, 26, 23, 59, 59).unwrap();
 
@@ -131,13 +130,15 @@ fn bench(c: &mut Criterion) {
     c.bench_function("meteostat.from_location.daily+filter+collect", |b| {
         b.iter(|| {
             rt.block_on(async {
-                let meteostat = Meteostat::new().await.unwrap();
                 let start_date = NaiveDate::from_ymd_opt(2023, 1, 1).unwrap();
                 let end_date = NaiveDate::from_ymd_opt(2023, 12, 31).unwrap();
 
                 let lazy_frame = meteostat
-                    .from_station()
-                    .station(black_box(station_str)) // Climate data often available for major stations
+                    .from_location()
+                    .location(black_box(LatLon {
+                        lat: 50.038,
+                        lon: 8.559,
+                    }))
                     .frequency(black_box(Frequency::Daily))
                     .call()
                     .await
@@ -152,11 +153,12 @@ fn bench(c: &mut Criterion) {
     c.bench_function("meteostat.from_location.monthly+filter+collect", |b| {
         b.iter(|| {
             rt.block_on(async {
-                let meteostat = Meteostat::new().await.unwrap();
-
                 let lazy_frame = meteostat
-                    .from_station()
-                    .station(black_box(station_str)) // Climate data often available for major stations
+                    .from_location()
+                    .location(black_box(LatLon {
+                        lat: 50.038,
+                        lon: 8.559,
+                    }))
                     .frequency(black_box(Frequency::Monthly))
                     .call()
                     .await
@@ -171,11 +173,12 @@ fn bench(c: &mut Criterion) {
     c.bench_function("meteostat.from_location.climate+filter+collect", |b| {
         b.iter(|| {
             rt.block_on(async {
-                let meteostat = Meteostat::new().await.unwrap();
-
                 let lazy_frame = meteostat
-                    .from_station()
-                    .station(black_box(station_str)) // Climate data often available for major stations
+                    .from_location()
+                    .location(black_box(LatLon {
+                        lat: 50.038,
+                        lon: 8.559,
+                    }))
                     .frequency(black_box(Frequency::Climate))
                     .call()
                     .await

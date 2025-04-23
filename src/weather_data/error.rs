@@ -84,15 +84,21 @@ pub enum WeatherDataError {
     },
 
     #[error("Polars operation failed for station {station}: {source}")]
-    PolarsError{
+    PolarsError {
         station: String,
         #[source]
         source: PolarsError,
     },
 
     #[error("Unexpected data state, station {station}: {message}")]
-    UnexpectedData{
-        message: String,
+    UnexpectedData { message: String, station: String },
+
+    #[error("Failed Polars column operation for station {station}: {source}")]
+    ColumnOperationError {
         station: String,
+        source: PolarsError,
     },
+    
+    #[error("Missing required column '{column}' for station {station}")]
+    MissingColumnError { station: String, column: String },
 }

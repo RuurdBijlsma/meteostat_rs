@@ -132,18 +132,18 @@ mod tests {
             .call()
             .await?;
 
-        let hourly_frame = data.collect().unwrap();
+        let hourly_frame = data.collect()?;
 
         let shape = hourly_frame.shape();
         assert!(shape.0 >= 719_681);
-        assert_eq!(shape.1, 13);
+        assert_eq!(shape.1, 14);
 
         let columns = hourly_frame.get_column_names();
         assert_eq!(
             columns,
             [
                 "date", "hour", "temp", "dwpt", "rhum", "prcp", "snow", "wdir", "wspd", "wpgt",
-                "pres", "tsun", "coco",
+                "pres", "tsun", "coco", "datetime"
             ]
         );
 
@@ -163,7 +163,7 @@ mod tests {
             .call()
             .await?;
 
-        let daily_frame = data.collect().unwrap();
+        let daily_frame = data.collect()?;
 
         let shape = daily_frame.shape();
         assert!(shape.0 >= 32_221);
@@ -193,7 +193,7 @@ mod tests {
             .call()
             .await?;
 
-        let monthly_frame = data.collect().unwrap();
+        let monthly_frame = data.collect()?;
         dbg!(&monthly_frame);
 
         Ok(())
@@ -210,7 +210,7 @@ mod tests {
             .call()
             .await?;
 
-        let climate_frame = data.collect().unwrap();
+        let climate_frame = data.collect()?;
         dbg!(&climate_frame);
 
         Ok(())
@@ -230,17 +230,17 @@ mod tests {
             .call()
             .await?;
 
-        let frame = hourly_data.collect().unwrap();
+        let frame = hourly_data.collect()?;
 
         let shape = frame.shape();
-        assert_eq!(shape.1, 13);
+        assert_eq!(shape.1, 14);
 
         let columns = frame.get_column_names();
         assert_eq!(
             columns,
             [
                 "date", "hour", "temp", "dwpt", "rhum", "prcp", "snow", "wdir", "wspd", "wpgt",
-                "pres", "tsun", "coco",
+                "pres", "tsun", "coco", "datetime"
             ]
         );
 

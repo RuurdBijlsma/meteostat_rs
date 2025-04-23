@@ -134,25 +134,23 @@ impl WeatherDataLoader {
         data_type: Frequency,
     ) -> Result<DataFrame, WeatherDataError> {
         let station_owned = station.to_string();
-        let schema_names = data_type.get_schema_column_names();
+        let schema_names = data_type.get_schema_column_names(); // Original CSV schema
 
         task::spawn_blocking(move || {
             let mut temp_file = NamedTempFile::new().map_err(|e| WeatherDataError::CsvReadIo {
                 station: station_owned.clone(),
                 source: e,
             })?;
-            temp_file
-                .write_all(&bytes)
-                .map_err(|e| WeatherDataError::CsvReadIo {
-                    station: station_owned.clone(),
-                    source: e,
-                })?;
+            temp_file.write_all(&bytes).map_err(|e| WeatherDataError::CsvReadIo {
+                station: station_owned.clone(),
+                source: e,
+            })?;
             temp_file.flush().map_err(|e| WeatherDataError::CsvReadIo {
                 station: station_owned.clone(),
                 source: e,
             })?;
 
-
+            // Read the initial DataFrame
             let mut df = CsvReadOptions::default()
                 .with_has_header(false)
                 .try_into_reader_with_file_path(Some(temp_file.path().to_path_buf()))
@@ -176,15 +174,79 @@ impl WeatherDataLoader {
                 });
             }
 
-            df.set_column_names(schema_names.iter().copied()) // Corrected this line
+            df.set_column_names(schema_names.iter().copied())
                 .map_err(|e| WeatherDataError::ColumnRenameError {
-                    station: station_owned,
+                    station: station_owned.clone(), // Pass owned string
                     source: e,
                 })?;
 
-            Ok(df)
+            // --- START Pre-computation ---
+            if data_type == Frequency::Hourly {
+                if df.column("date").is_ok() && df.column("hour").is_ok() {
+                    df = df.lazy()
+                        .with_column(
+                            ( // Parentheses recommended for clarity with operators
+                                col("date")
+                                    .str()
+                                    .strptime(
+                                        DataType::Date,
+                                        StrptimeOptions {
+                                            format: Some("%Y-%m-%d".into()),
+                                            strict: true,
+                                            exact: true,
+                                            cache: true,
+                                        },
+                                        lit("raise"),
+                                    )
+                                    .cast(DataType::Datetime(TimeUnit::Milliseconds, None))
+                                    +
+                                    duration(DurationArgs::new().with_hours(col("hour")))
+                            ).alias("datetime") // Alias the result of the addition
+                        )
+                        .collect()
+                        .map_err(|e| WeatherDataError::ColumnOperationError {
+                            station: station_owned.clone(),
+                            source: e,
+                        })?;
+                } else {
+                    warn!("'date' or 'hour' column missing for station {}, cannot create 'datetime' column.", station_owned);
+                    // Consider returning an error here if the column is essential
+                    // return Err(WeatherDataError::MissingColumnError { ... });
+                }
+            } else if data_type == Frequency::Daily {
+                // ... (daily pre-computation remains the same) ...
+                if df.column("date").is_ok() {
+                    df = df.lazy()
+                        .with_column(
+                            col("date")
+                                .str()
+                                .strptime(
+                                    DataType::Date,
+                                    StrptimeOptions {
+                                        format: Some("%Y-%m-%d".into()),
+                                        strict: true,
+                                        exact: true,
+                                        cache: true,
+                                    },
+                                    lit("raise"),
+                                )
+                                .cast(DataType::Date) // Ensure it's cast to Date if needed
+                                .alias("date") // overwrite date column
+                        )
+                        .collect()
+                        .map_err(|e| WeatherDataError::ColumnOperationError {
+                            station: station_owned.clone(),
+                            source: e,
+                        })?;
+                } else {
+                    warn!("'date' column missing for station {} (daily), cannot create 'date_parsed' column.", station_owned);
+                }
+            }
+
+            Ok(df) // Return the (potentially modified) DataFrame
         })
-            .await?
+            .await? // Unwrap the JoinError
+                    // Propagate the inner Result<DataFrame, WeatherDataError>
     }
 
     /// Writes a DataFrame to a Parquet file asynchronously using spawn_blocking.
