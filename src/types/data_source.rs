@@ -61,7 +61,7 @@ impl fmt::Display for Frequency {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RequiredDate {
     /// Check only if *any* data exists for the frequency (start/end dates are present).
     Any,

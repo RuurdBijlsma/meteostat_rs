@@ -1,11 +1,11 @@
 use chrono::{NaiveDate, TimeZone, Utc};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use meteostat::filtering::MeteostatFrameFilterExt;
 use meteostat::meteostat::{LatLon, Meteostat};
 use meteostat::stations::locate_station::StationLocator;
 use meteostat::types::data_source::Frequency;
 use meteostat::utils::get_cache_dir;
 use tokio::runtime::Runtime;
-use meteostat::filtering::MeteostatFrameFilterExt;
 
 fn bench(c: &mut Criterion) {
     let station_str = "10637";
@@ -112,11 +112,15 @@ fn bench(c: &mut Criterion) {
                 let end_utc = Utc.with_ymd_and_hms(2023, 10, 26, 23, 59, 59).unwrap();
 
                 let lazy_frame = meteostat
-                    .from_station()
-                    .station(black_box(station_str)) // Climate data often available for major stations
+                    .from_location()
+                    .location(black_box(LatLon {
+                        lat: 50.038,
+                        lon: 8.559,
+                    }))
                     .frequency(black_box(Frequency::Hourly))
                     .call()
-                    .await.unwrap();
+                    .await
+                    .unwrap();
 
                 let filtered_lazy_frame = lazy_frame.filter_hourly(start_utc, end_utc);
                 let _ = filtered_lazy_frame.collect().unwrap();
@@ -136,7 +140,8 @@ fn bench(c: &mut Criterion) {
                     .station(black_box(station_str)) // Climate data often available for major stations
                     .frequency(black_box(Frequency::Daily))
                     .call()
-                    .await.unwrap();
+                    .await
+                    .unwrap();
 
                 let filtered_lazy_frame = lazy_frame.filter_daily(start_date, end_date);
                 let _ = filtered_lazy_frame.collect().unwrap();
@@ -154,7 +159,8 @@ fn bench(c: &mut Criterion) {
                     .station(black_box(station_str)) // Climate data often available for major stations
                     .frequency(black_box(Frequency::Monthly))
                     .call()
-                    .await.unwrap();
+                    .await
+                    .unwrap();
 
                 let filtered_lazy_frame = lazy_frame.filter_monthly(2020, 2022);
                 let _ = filtered_lazy_frame.collect().unwrap();
@@ -172,7 +178,8 @@ fn bench(c: &mut Criterion) {
                     .station(black_box(station_str)) // Climate data often available for major stations
                     .frequency(black_box(Frequency::Climate))
                     .call()
-                    .await.unwrap();
+                    .await
+                    .unwrap();
 
                 // Filter for the 1991-2020 climate period records specifically
                 let filtered_lazy_frame = lazy_frame.filter_climate(1991, 2020);
@@ -197,7 +204,14 @@ fn bench(c: &mut Criterion) {
     c.bench_function("station_cache.query", |b| {
         b.iter(|| {
             rt.block_on(async {
-                station_cache.query(black_box(50.), black_box(5.), black_box(5), black_box(30.0))
+                station_cache.query(
+                    black_box(50.),
+                    black_box(5.),
+                    black_box(5),
+                    black_box(30.0),
+                    black_box(None),
+                    black_box(None),
+                )
             });
         });
     });

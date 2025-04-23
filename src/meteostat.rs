@@ -1,9 +1,9 @@
 use crate::error::MeteostatError;
 use crate::stations::locate_station::StationLocator;
-use crate::types::data_source::Frequency;
+use crate::types::data_source::{Frequency, RequiredDate};
 use crate::utils::get_cache_dir;
 use crate::weather_data::frame_fetcher::FrameFetcher;
-use bon::bon;
+use bon::{bon, Builder};
 use polars::prelude::LazyFrame;
 use std::path::PathBuf;
 
@@ -11,6 +11,12 @@ use std::path::PathBuf;
 pub struct LatLon {
     pub lat: f64,
     pub lon: f64,
+}
+
+#[derive(Builder, Debug, Clone, PartialEq)]
+pub struct InventoryRequest {
+    frequency: Frequency,
+    required_date: RequiredDate,
 }
 
 pub struct Meteostat {
@@ -52,11 +58,11 @@ impl Meteostat {
         location: LatLon,
         frequency: Frequency,
         max_distance_km: Option<f64>,
-        stations_to_try: Option<usize>,
+        station_limit: Option<usize>,
+        required_date: Option<RequiredDate>,
     ) -> Result<LazyFrame, MeteostatError> {
         let max_distance_km = max_distance_km.unwrap_or(50.0);
-        // How many nearby stations to attempt (e.g., 5)
-        let stations_limit = stations_to_try.unwrap_or(5);
+        let stations_limit = station_limit.unwrap_or(1);
 
         // Query for multiple stations
         let stations = self.station_locator.query(
@@ -64,8 +70,8 @@ impl Meteostat {
             location.lon,
             stations_limit,
             max_distance_km,
-            None,
-            None,
+            Some(frequency),
+            required_date,
         );
 
         // Handle case where no stations are found within the radius
