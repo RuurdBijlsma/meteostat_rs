@@ -1,5 +1,5 @@
-use meteostat::stations::locate_station::StationLocator;
 use meteostat::stations::error::LocateStationError;
+use meteostat::stations::locate_station::StationLocator;
 use meteostat::utils::get_cache_dir;
 
 #[tokio::main]
@@ -11,7 +11,7 @@ async fn main() -> Result<(), LocateStationError> {
     let cache_dir = get_cache_dir()?;
 
     let db = StationLocator::new(&cache_dir).await?;
-    let nearest = db.query(lat, lon, n_results, max_km);
+    let nearest = db.query(lat, lon, n_results, max_km, None, None);
     println!("\nNearest stations to {} {}", lat, lon);
     for (station, distance) in nearest {
         println!(

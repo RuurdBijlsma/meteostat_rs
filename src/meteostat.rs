@@ -59,9 +59,14 @@ impl Meteostat {
         let stations_limit = stations_to_try.unwrap_or(5);
 
         // Query for multiple stations
-        let stations =
-            self.station_locator
-                .query(location.lat, location.lon, stations_limit, max_distance_km);
+        let stations = self.station_locator.query(
+            location.lat,
+            location.lon,
+            stations_limit,
+            max_distance_km,
+            None,
+            None,
+        );
 
         // Handle case where no stations are found within the radius
         if stations.is_empty() {

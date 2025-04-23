@@ -1,3 +1,4 @@
+use chrono::NaiveDate;
 use std::fmt;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -37,8 +38,7 @@ impl Frequency {
                 "tsun",
             ],
             Frequency::Monthly => vec![
-                "year", "month", "tavg", "tmin", "tmax", "prcp", "wspd",
-                "pres", "tsun",
+                "year", "month", "tavg", "tmin", "tmax", "prcp", "wspd", "pres", "tsun",
             ],
             Frequency::Climate => vec![
                 "start_year",
@@ -59,4 +59,14 @@ impl fmt::Display for Frequency {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.path_segment())
     }
+}
+
+#[derive(Debug, Clone)]
+pub enum RequiredDate {
+    /// Check only if *any* data exists for the frequency (start/end dates are present).
+    Any,
+    /// Check if data is available for a specific date.
+    SpecificDate(NaiveDate),
+    /// Check if data is available covering a specific date range (inclusive).
+    DateRange { start: NaiveDate, end: NaiveDate },
 }

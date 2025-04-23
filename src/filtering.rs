@@ -1,5 +1,5 @@
 use crate::types::into_utc_trait::IntoUtcDateTime;
-use chrono::{NaiveDate, Utc};
+use chrono::{NaiveDate};
 use polars::prelude::{
     col, duration, lit, DataType, DurationArgs, LazyFrame, StrptimeOptions, TimeUnit,
 };
@@ -428,7 +428,7 @@ mod tests {
         // No need for real Meteostat here
         // let meteostat = get_meteostat().await?;
 
-        // Create a dummy LazyFrame with an invalid date format
+        // Create a fake LazyFrame with an invalid date format
         use polars::prelude::*;
         let df = df! {
             "date" => &["26/10/2023", "27/10/2023"], // Invalid format for "%Y-%m-%d"
