@@ -1,6 +1,6 @@
 use crate::types::into_utc_trait::IntoUtcDateTime;
 use chrono::NaiveDate;
-use polars::prelude::{col, lit, DataType, LazyFrame, TimeUnit};
+use polars::prelude::{col, lit, DataType, LazyFrame};
 
 pub trait MeteostatFrameFilterExt {
     /// Filters an hourly LazyFrame by a UTC datetime range (inclusive).
@@ -65,15 +65,12 @@ impl MeteostatFrameFilterExt for LazyFrame {
         let start_naive = start.into_utc().naive_utc();
         let end_naive = end.into_utc().naive_utc();
 
-        // Filter directly on the pre-computed 'datetime' column
+        // Filter directly on the 'datetime' column, assuming it's already the correct type
         self.filter(
-            col("datetime") // Use the pre-computed datetime column
-                .cast(DataType::Datetime(TimeUnit::Milliseconds, None)) // Ensure correct type for comparison
-                .gt_eq(lit(start_naive))
+            col("datetime")
+                .gt_eq(lit(start_naive)) // No cast
                 .and(
-                    col("datetime")
-                        .cast(DataType::Datetime(TimeUnit::Milliseconds, None)) // Ensure correct type
-                        .lt_eq(lit(end_naive)),
+                    col("datetime").lt_eq(lit(end_naive)), // No cast
                 ),
         )
     }
@@ -119,14 +116,11 @@ mod tests {
     use crate::error::MeteostatError;
     use crate::meteostat::{LatLon, Meteostat};
     use crate::types::data_source::Frequency;
-    use chrono::{NaiveDate, NaiveDateTime, TimeZone, Utc};
-    use polars::prelude::{
-        DateChunked, DatetimeChunked, TimeUnit,
-    };
+    use chrono::{DateTime, NaiveDate, TimeZone, Utc};
+    use polars::prelude::{DateChunked, DatetimeChunked, TimeUnit};
 
     #[tokio::test]
     async fn test_get_hourly_filtered() -> Result<(), MeteostatError> {
-
         let meteostat = Meteostat::new().await?;
 
         let lazy_frame = meteostat
@@ -180,19 +174,17 @@ mod tests {
                         // Convert the timestamp integer to NaiveDateTime based on the column's TimeUnit
                         let record_naive_dt = match time_unit {
                             TimeUnit::Milliseconds => {
-                                NaiveDateTime::from_timestamp_millis(timestamp)
+                                DateTime::<Utc>::from_timestamp_millis(timestamp)
                             }
                             TimeUnit::Microseconds => {
-                                NaiveDateTime::from_timestamp_micros(timestamp)
+                                DateTime::<Utc>::from_timestamp_micros(timestamp)
                             }
                             TimeUnit::Nanoseconds => {
-                                // NaiveDateTime::from_timestamp_nanos exists from chrono 0.4.31+
-                                // If using older chrono, need division:
-                                // NaiveDateTime::from_timestamp_opt(timestamp / 1_000_000_000, (timestamp % 1_000_000_000) as u32)
-                                NaiveDateTime::from_timestamp_nanos(timestamp) // Use this if chrono >= 0.4.31
+                                Some(DateTime::<Utc>::from_timestamp_nanos(timestamp))
                             }
                         }
-                        .expect("Invalid timestamp conversion in datetime column");
+                        .expect("Invalid timestamp conversion in datetime column")
+                        .naive_utc();
 
                         assert!(
                             record_naive_dt >= start_naive && record_naive_dt <= end_naive,
@@ -215,7 +207,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_daily_filtered() -> Result<(), MeteostatError> {
-
         let meteostat = Meteostat::new().await?;
 
         let lazy_frame = meteostat
@@ -377,15 +368,12 @@ mod tests {
                     Some(timestamp) => {
                         // Convert the timestamp integer to NaiveDateTime based on the column's TimeUnit
                         let record_naive_dt = match time_unit {
-                            TimeUnit::Milliseconds => {
-                                NaiveDateTime::from_timestamp_millis(timestamp)
-                            }
-                            TimeUnit::Microseconds => {
-                                NaiveDateTime::from_timestamp_micros(timestamp)
-                            }
-                            TimeUnit::Nanoseconds => NaiveDateTime::from_timestamp_nanos(timestamp), // Use this if chrono >= 0.4.31
+                            TimeUnit::Milliseconds => DateTime::<Utc>::from_timestamp_millis(timestamp),
+                            TimeUnit::Microseconds => DateTime::<Utc>::from_timestamp_micros(timestamp),
+                            TimeUnit::Nanoseconds => Some(DateTime::<Utc>::from_timestamp_nanos(timestamp)),
                         }
-                        .expect("Invalid timestamp conversion in datetime column");
+                            .expect("Invalid timestamp conversion in datetime column") // Unwrap the Option<DateTime<Utc>>
+                            .naive_utc(); // Convert DateTime<Utc> to NaiveDateTime
 
                         assert!(
                             record_naive_dt >= start_naive && record_naive_dt <= end_naive,
