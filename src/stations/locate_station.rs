@@ -280,12 +280,12 @@ impl StationLocator {
             );
 
             // --- 3. Check max distance ---
+            if dist_km * 2.0 > max_distance_km {
+                // It's Joever.
+                break;
+            }
             if dist_km > max_distance_km {
-                // Optimization: If the R-Tree starts giving points much farther
-                // than our max distance AND the heap is full, we *could* potentially
-                // break early, but it's safer just to continue filtering.
-                // If R-tree distance correlated perfectly with Haversine, we could
-                // stop if the R-tree distance > max_distance_km, but it doesn't.
+                // Slight chance one of the next stations will be within range.
                 continue;
             }
 

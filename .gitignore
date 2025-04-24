@@ -1,3 +1,4 @@
 /target
 .idea
 *.sqlite
+temperature_plot.png

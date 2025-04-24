@@ -41,7 +41,18 @@ thiserror = "2.0.12"
 log = "0.4.27"
 bon = "3.6.3"
 ordered-float = "5.0.0"
+# Optional:
+plotters = { version = "0.3.7", optional = true }
 
 
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["async_tokio"] }
+
+[features]
+default = []
+plotting = ["dep:plotters"]
+
+[[example]]
+name = "graph_data"
+path = "examples/graph_data.rs"
+required-features = ["plotting"]

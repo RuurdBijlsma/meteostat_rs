@@ -3,3 +3,4 @@
 * overdreven veel comments weghalen
 * helper functions to turn frame output into rust structs or vec of rust structs (trait TryFromPolarsRow)
 * add trait endpoints to get a single datapoint from a frame
+* doc examples
