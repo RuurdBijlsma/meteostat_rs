@@ -1,34 +1,43 @@
-// src/error.rs
+use crate::stations::error::LocateStationError;
+use crate::types::data_source::Frequency;
+use crate::weather_data::error::WeatherDataError;
+use std::path::PathBuf;
 use thiserror::Error;
 
-#[derive(Error, Debug)]
+#[derive(Debug, Error)]
 pub enum MeteostatError {
-    #[error("Network request failed: {0}")]
-    Network(#[from] reqwest::Error),
+    #[error(transparent)]
+    WeatherData(#[from] WeatherDataError),
 
-    #[error("Failed to decompress data: {0}")]
-    Decompression(#[from] std::io::Error),
+    #[error(transparent)]
+    LocateStation(#[from] LocateStationError),
 
-    #[error("Failed to parse JSON: {0}")]
-    JsonParsing(#[from] serde_json::Error),
+    #[error("Polars error occurred while filtering data {0}.")]
+    PolarsError(#[from] polars::error::PolarsError),
 
-    #[error("Failed to parse CSV/Data: {0}")]
-    DataParsing(#[from] polars::prelude::PolarsError),
+    #[error("Failed to create cache directory '{0}'")]
+    CacheDirCreation(PathBuf, #[source] std::io::Error),
 
-    #[error("No weather stations found in the provided list")]
-    NoStationsFound,
+    #[error("Failed to determine cache directory")]
+    CacheDirResolution(#[from] std::io::Error),
 
-    #[error("Could not find a suitable station near the specified location")]
-    NoSuitableStation,
+    #[error("No {granularity} data found for datetime: {datetime} and position: {latitude}, {longitude}.")]
+    NoDataFound {
+        datetime: String,
+        latitude: f64,
+        longitude: f64,
+        granularity: Frequency,
+    },
 
-    #[error("Station '{0}' not found or has no hourly data (HTTP 404)")]
-    StationNotFound(String),
+    #[error("No station within radius: {radius} km, at position {lat}, {lon}")]
+    NoStationWithinRadius { radius: f64, lat: f64, lon: f64 },
 
-    #[error("Invalid input: {0}")]
-    InvalidInput(String),
-
-    #[error("Timestamp conversion error: {0}")]
-    TimestampConversion(String),
+    #[error("Tried {stations_tried} stations near ({lat}, {lon}) within {radius} km, but failed to fetch data. Last error: {last_error:?}")]
+    NoDataFoundForNearbyStations {
+        radius: f64,
+        lat: f64,
+        lon: f64,
+        stations_tried: usize,
+        last_error: Option<Box<MeteostatError>>,
+    },
 }
-
-pub type Result<T> = std::result::Result<T, MeteostatError>;
