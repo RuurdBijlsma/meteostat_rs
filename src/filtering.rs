@@ -1,6 +1,6 @@
 use crate::types::into_utc_trait::IntoUtcDateTime;
 use chrono::{Duration, NaiveDate, Timelike};
-use polars::prelude::{col, lit, DataType, LazyFrame};
+use polars::prelude::{col, lit, LazyFrame};
 
 pub trait MeteostatFrameFilterExt {
     /// Filters an hourly LazyFrame by a UTC datetime range (inclusive).
@@ -57,7 +57,10 @@ pub trait MeteostatFrameFilterExt {
 
     /// Gets a single row from an hourly LazyFrame matching the hour closest
     /// to the specific UTC datetime provided.
-    /// Rounds the input datetime to the nearest hour (>= 30 minutes rounds up).
+    /// Rounds the input datetime to the nearest hour
+    /// (e.g., 12:30 rounds up to 13:00, 12:29 rounds down to 12:00).
+    ///
+    ///
     ///
     /// # Arguments
     /// * `datetime`: The UTC DateTime to find the nearest hourly record for.
@@ -119,13 +122,8 @@ impl MeteostatFrameFilterExt for LazyFrame {
         // Filter directly on the pre-parsed 'date' column (which is now DataType::Date)
         self.filter(
             col("date")
-                .cast(DataType::Date) // Ensure correct type for comparison
                 .gt_eq(lit(start_date))
-                .and(
-                    col("date")
-                        .cast(DataType::Date) // Ensure correct type
-                        .lt_eq(lit(end_date)),
-                ),
+                .and(col("date").lt_eq(lit(end_date))),
         )
     }
 
@@ -179,7 +177,7 @@ impl MeteostatFrameFilterExt for LazyFrame {
     }
 
     fn get_daily_row(self, date: NaiveDate) -> LazyFrame {
-        self.filter(col("date").cast(DataType::Date).eq(lit(date))) // Use exact equality
+        self.filter(col("date").eq(lit(date))) // Use exact equality
     }
 
     fn get_monthly_row(self, year: i32, month: u32) -> LazyFrame {
@@ -409,10 +407,7 @@ mod tests {
         let meteostat = Meteostat::new().await?;
         let lazy_frame = meteostat
             .from_location()
-            .location(LatLon {
-                lat: 52.520008,
-                lon: 13.404954,
-            })
+            .location(LatLon(52.520008, 13.404954))
             .frequency(Frequency::Hourly)
             .call()
             .await?;

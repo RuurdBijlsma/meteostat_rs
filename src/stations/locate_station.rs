@@ -1,17 +1,17 @@
 use crate::stations::error::LocateStationError;
-use crate::types::data_source::{Frequency, RequiredDate};
+use crate::types::data_source::{Frequency, RequiredData};
 use crate::types::station::YearRange;
 use crate::types::station::{DateRange, Station};
 use async_compression::tokio::bufread::GzipDecoder;
 use bincode;
 use bincode::config::{Configuration, Fixint, LittleEndian};
-use chrono::Datelike;
+use chrono::{Datelike, NaiveDate};
 use futures_util::TryStreamExt;
 use haversine::{distance, Location as HaversineLocation, Units};
 use ordered_float::OrderedFloat;
 use reqwest::Client;
 use rstar::RTree;
-use std::cmp::Ordering; // <-- Import Ordering
+use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use std::io::{self};
 use std::path::Path;
@@ -160,8 +160,8 @@ impl StationLocator {
         n_results: usize,
         max_distance_km: f64,
         frequency: Option<Frequency>,
-        required_date: Option<RequiredDate>,
-    ) -> Vec<(&Station, f64)> {
+        required_date: Option<RequiredData>,
+    ) -> Vec<(Station, f64)> {
         if n_results == 0 {
             return vec![];
         }
@@ -192,7 +192,7 @@ impl StationLocator {
         longitude: f64,
         n_results: usize,
         max_distance_km: f64,
-    ) -> Vec<(&Station, f64)> {
+    ) -> Vec<(Station, f64)> {
         let query_point_rtree = [latitude, longitude];
 
         // Heuristic limit: Take slightly more than needed to account for distance filtering
@@ -205,7 +205,7 @@ impl StationLocator {
             .take(candidate_limit)
             .collect();
 
-        let mut stations_with_dist: Vec<(&Station, f64)> = initial_candidates
+        let mut stations_with_dist: Vec<(Station, f64)> = initial_candidates
             .into_iter()
             .filter_map(|station| {
                 // Use filter_map for combined Haversine calc + distance filter
@@ -223,7 +223,7 @@ impl StationLocator {
                 );
 
                 if dist_km <= max_distance_km {
-                    Some((station, dist_km))
+                    Some((station.to_owned(), dist_km))
                 } else {
                     None
                 }
@@ -246,8 +246,8 @@ impl StationLocator {
         n_results: usize,
         max_distance_km: f64,
         frequency: Frequency,
-        required_date: Option<RequiredDate>,
-    ) -> Vec<(&Station, f64)> {
+        required_date: Option<RequiredData>,
+    ) -> Vec<(Station, f64)> {
         let query_point_rtree = [latitude, longitude];
         let mut heap: BinaryHeap<StationCandidate<'_>> = BinaryHeap::with_capacity(n_results);
 
@@ -317,10 +317,10 @@ impl StationLocator {
         } // End R-tree iteration
 
         // --- 6. Extract results from the heap ---
-        let results: Vec<(&Station, f64)> = heap
+        let results: Vec<(Station, f64)> = heap
             .into_sorted_vec() // Sorts ascending by distance (based on Ord impl)
             .into_iter()
-            .map(|c| (c.station, c.distance_km.into_inner()))
+            .map(|c| (c.station.to_owned(), c.distance_km.into_inner()))
             .collect();
 
         results
@@ -330,13 +330,13 @@ impl StationLocator {
     fn station_meets_criteria(
         station: &Station,
         frequency: Option<Frequency>,
-        required_date: Option<&RequiredDate>,
+        required_date: Option<&RequiredData>,
     ) -> bool {
         let freq = match frequency {
             Some(f) => f,
             None => return true, // No filter applied
         };
-        let req_date = required_date.unwrap_or(&RequiredDate::Any);
+        let req_date = required_date.unwrap_or(&RequiredData::Any);
         match freq {
             Frequency::Daily => {
                 Self::check_date_range_inventory(&station.inventory.daily, req_date)
@@ -354,35 +354,44 @@ impl StationLocator {
     }
     fn check_date_range_inventory(
         inventory_range: &DateRange,
-        required_date: &RequiredDate,
+        required_date: &RequiredData,
     ) -> bool {
         let (Some(inv_start), Some(inv_end)) = (inventory_range.start, inventory_range.end) else {
             return false;
         };
         match required_date {
-            RequiredDate::Any => true,
-            RequiredDate::SpecificDate(req) => inv_start <= *req && *req <= inv_end,
-            RequiredDate::DateRange {
+            RequiredData::Any => true,
+            RequiredData::SpecificDate(req) => inv_start <= *req && *req <= inv_end,
+            RequiredData::DateRange {
                 start: req_s,
                 end: req_e,
             } => inv_start <= *req_s && inv_end >= *req_e,
+            RequiredData::Year(year) => {
+                let Some(req_start) = NaiveDate::from_ymd_opt(*year, 1, 1) else {
+                    return false;
+                };
+                let Some(req_end) = NaiveDate::from_ymd_opt(*year, 12, 31) else {
+                    return false;
+                };
+                inv_start <= req_start && inv_end >= req_end
+            }
         }
     }
     fn check_year_range_inventory(
         inventory_range: &YearRange,
-        required_date: &RequiredDate,
+        required_date: &RequiredData,
     ) -> bool {
         let (Some(inv_start_y), Some(inv_end_y)) = (inventory_range.start, inventory_range.end)
         else {
             return false;
         };
         match required_date {
-            RequiredDate::Any => true,
-            RequiredDate::SpecificDate(req) => {
+            RequiredData::Any => true,
+            RequiredData::SpecificDate(req) => {
                 let req_y = req.year();
                 inv_start_y <= req_y && req_y <= inv_end_y
             }
-            RequiredDate::DateRange {
+            RequiredData::DateRange {
                 start: req_s,
                 end: req_e,
             } => {
@@ -390,16 +399,19 @@ impl StationLocator {
                 let req_e_y = req_e.year();
                 inv_start_y <= req_s_y && inv_end_y >= req_e_y
             }
+            RequiredData::Year(year)=> {
+                let req_y = *year;
+                inv_start_y <= req_y && req_y <= inv_end_y
+            }
         }
     }
-    // --- End inventory check helpers ---
 }
 
 // --- Tests Module (should still pass, calling the main `query` function) ---
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::data_source::{Frequency, RequiredDate};
+    use crate::types::data_source::{Frequency, RequiredData};
     use crate::types::station::Station;
     // Make sure get_cache_dir is available or replace with hardcoded path for tests
     use crate::utils::get_cache_dir;
@@ -418,7 +430,7 @@ mod tests {
 
     // Helper to validate basic query results (consider adding back criteria check)
     fn validate_results(
-        results: &Vec<(&Station, f64)>,
+        results: &Vec<(Station, f64)>,
         expected_max_len: usize,
         max_distance_km: f64,
         // You might want to pass frequency/required_date back in for deeper validation
@@ -481,7 +493,7 @@ mod tests {
         let n = 3;
         let max_d = 150.0;
         let freq = Some(Frequency::Daily);
-        let req_date = Some(RequiredDate::Any);
+        let req_date = Some(RequiredData::Any);
         let results = locator.query(lat, lon, n, max_d, freq, req_date);
         println!(
             "Frequency Query (Berlin, Daily, Any): Found {} results (max {}) within {} km",
@@ -505,7 +517,7 @@ mod tests {
         let max_d = 200.0;
         let freq = Some(Frequency::Hourly);
         let specific_date = NaiveDate::from_ymd_opt(2022, 1, 15).unwrap();
-        let req_date = Some(RequiredDate::SpecificDate(specific_date));
+        let req_date = Some(RequiredData::SpecificDate(specific_date));
         let results = locator.query(lat, lon, n, max_d, freq, req_date);
         println!(
             "Frequency+Date Query (LA, Hourly, {}): Found {} results (max {}) within {} km",
@@ -536,7 +548,7 @@ mod tests {
         let freq = Some(Frequency::Monthly);
         let start_date = NaiveDate::from_ymd_opt(2010, 1, 1).unwrap();
         let end_date = NaiveDate::from_ymd_opt(2019, 12, 31).unwrap();
-        let req_date = Some(RequiredDate::DateRange {
+        let req_date = Some(RequiredData::DateRange {
             start: start_date,
             end: end_date,
         });
@@ -568,7 +580,7 @@ mod tests {
         let n = 5;
         let max_d = 300.0;
         let freq = Some(Frequency::Climate);
-        let req_date = Some(RequiredDate::Any);
+        let req_date = Some(RequiredData::Any);
         let results = locator.query(lat, lon, n, max_d, freq, req_date);
         println!(
             "Climate Query (Sydney, Any): Found {} results (max {}) within {} km",
@@ -623,7 +635,7 @@ mod tests {
         let max_d = 100.0;
         let freq = Some(Frequency::Daily);
         let specific_date = NaiveDate::from_ymd_opt(2099, 12, 31).unwrap();
-        let req_date = Some(RequiredDate::SpecificDate(specific_date));
+        let req_date = Some(RequiredData::SpecificDate(specific_date));
         let results = locator.query(lat, lon, n, max_d, freq, req_date);
         println!(
             "Date Outside Range Query (London, Daily, {}): Found {} results (max {}) within {} km",

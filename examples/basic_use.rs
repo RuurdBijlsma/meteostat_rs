@@ -15,10 +15,7 @@ async fn main() -> Result<(), MeteostatError> {
 
     let weather_data = meteostat
         .from_location()
-        .location(LatLon {
-            lat: 30.092355,
-            lon: -97.829935,
-        })
+        .location(LatLon(30.092355, -97.829935))
         .frequency(Frequency::Hourly)
         .call()
         .await?

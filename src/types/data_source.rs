@@ -61,12 +61,14 @@ impl fmt::Display for Frequency {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum RequiredDate {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum RequiredData {
     /// Check only if *any* data exists for the frequency (start/end dates are present).
     Any,
     /// Check if data is available for a specific date.
     SpecificDate(NaiveDate),
     /// Check if data is available covering a specific date range (inclusive).
     DateRange { start: NaiveDate, end: NaiveDate },
+    /// Year is shorthand for a DateRange for a full year.
+    Year(i32),
 }
