@@ -504,10 +504,16 @@ impl MeteostatFrameFilterExt for LazyFrame {
     }
 
     fn filter_daily_by_year(self, year: i32) -> Result<LazyFrame, polars::error::PolarsError> {
-        let start_date = NaiveDate::from_ymd_opt(year, 1, 1)
-            .ok_or_else(|| polars::error::PolarsError::ComputeError(format!("Invalid start date for year {}", year).into()))?;
-        let end_date = NaiveDate::from_ymd_opt(year, 12, 31)
-            .ok_or_else(|| polars::error::PolarsError::ComputeError(format!("Invalid end date for year {}", year).into()))?;
+        let start_date = NaiveDate::from_ymd_opt(year, 1, 1).ok_or_else(|| {
+            polars::error::PolarsError::ComputeError(
+                format!("Invalid start date for year {}", year).into(),
+            )
+        })?;
+        let end_date = NaiveDate::from_ymd_opt(year, 12, 31).ok_or_else(|| {
+            polars::error::PolarsError::ComputeError(
+                format!("Invalid end date for year {}", year).into(),
+            )
+        })?;
         Ok(self.filter_daily(start_date, end_date))
     }
 
@@ -1138,6 +1144,40 @@ mod tests {
             "The retrieved row's month does not match the target"
         );
 
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_hourly_row_contents() -> Result<(), MeteostatError> {
+        let client = Meteostat::new().await?;
+        let station_id = "10637";
+        // Assume `lazy_hourly_frame` is obtained from the client
+        let lazy_hourly_frame = client
+            .from_station()
+            .station(station_id)
+            .frequency(Frequency::Hourly)
+            .call()
+            .await?;
+
+        // Target time: 2023-10-26 14:45:00 UTC (will round up to 15:00)
+        let target_dt = Utc.with_ymd_and_hms(2023, 10, 26, 14, 45, 0).unwrap();
+
+        // Get the row closest to the target time
+        let closest_row_lf = lazy_hourly_frame.get_hourly_row(target_dt);
+
+        // Collect the result
+        let closest_row_df = closest_row_lf.collect()?;
+
+        println!("Hourly row nearest {}:\n{}", target_dt, closest_row_df);
+        assert!(closest_row_df.height() <= 1); // Should be 0 or 1 row
+
+        // If a row was found, check its datetime (should be 15:00:00)
+        if closest_row_df.height() == 1 {
+            let result_dt_series = closest_row_df.column("datetime")?.datetime()?;
+            let result_ts = result_dt_series.get(0).unwrap();
+            let result_dt_utc = chrono::DateTime::<Utc>::from_timestamp_millis(result_ts);
+            println!("Result datetime: {:?}", result_dt_utc);
+        }
         Ok(())
     }
 }
