@@ -35,7 +35,7 @@ pub struct Station {
     pub inventory: Inventory,
 }
 
-/// Stores the data availability ranges for different [`Frequency`] types for a station.
+/// Stores the data availability ranges for different [`crate::Frequency`] types for a station.
 ///
 /// Indicates the approximate start and end dates/years for which data is expected
 /// to be available according to Meteostat's metadata. Note that gaps might exist

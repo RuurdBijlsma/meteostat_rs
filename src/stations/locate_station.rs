@@ -34,18 +34,18 @@ struct StationCandidate<'a> {
     station: &'a Station,
 }
 // Manual implementations (only compare distance)
-impl<'a> PartialEq for StationCandidate<'a> {
+impl PartialEq for StationCandidate<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.distance_km == other.distance_km
     }
 }
-impl<'a> Eq for StationCandidate<'a> {}
-impl<'a> PartialOrd for StationCandidate<'a> {
+impl Eq for StationCandidate<'_> {}
+impl PartialOrd for StationCandidate<'_> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.distance_km.partial_cmp(&other.distance_km)
+        Some(self.cmp(other))
     }
 }
-impl<'a> Ord for StationCandidate<'a> {
+impl Ord for StationCandidate<'_> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.distance_km.cmp(&other.distance_km)
     }
@@ -430,7 +430,7 @@ mod tests {
 
     // Helper to validate basic query results (consider adding back criteria check)
     fn validate_results(
-        results: &Vec<(Station, f64)>,
+        results: &[(Station, f64)],
         expected_max_len: usize,
         max_distance_km: f64,
         // You might want to pass frequency/required_date back in for deeper validation
@@ -531,8 +531,8 @@ mod tests {
         for (s, _) in &results {
             let inv = &s.inventory.hourly;
             assert!(
-                inv.start.map_or(false, |st| st <= specific_date)
-                    && inv.end.map_or(false, |en| en >= specific_date)
+                inv.start.is_some_and(|st| st <= specific_date)
+                    && inv.end.is_some_and(|en| en >= specific_date)
             );
         }
         Ok(())
@@ -566,8 +566,8 @@ mod tests {
         for (s, _) in &results {
             let inv = &s.inventory.monthly;
             assert!(
-                inv.start.map_or(false, |sy| sy <= start_date.year())
-                    && inv.end.map_or(false, |ey| ey >= end_date.year())
+                inv.start.is_some_and(|sy| sy <= start_date.year())
+                    && inv.end.is_some_and(|ey| ey >= end_date.year())
             );
         }
         Ok(())

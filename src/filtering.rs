@@ -118,7 +118,7 @@ pub trait MeteostatFrameFilterExt {
 
     /// Filters a daily `LazyFrame` to include only records from a specific year.
     ///
-    /// This is a convenience wrapper around [`filter_daily`].
+    /// This is a convenience wrapper around [`MeteostatFrameFilterExt::filter_daily`].
     /// Assumes the `LazyFrame` contains a "date" column of type `DataType::Date`.
     ///
     /// # Arguments
@@ -272,7 +272,7 @@ pub trait MeteostatFrameFilterExt {
     /// # Arguments
     ///
     /// * `datetime`: The UTC `DateTime` to find the nearest hourly record for.
-    ///               Accepts any type implementing [`IntoUtcDateTime`].
+    ///   Accepts any type implementing [`IntoUtcDateTime`].
     ///
     /// # Returns
     ///
@@ -629,14 +629,10 @@ mod tests {
             let dt_col: &DatetimeChunked = frame
                 .column("datetime")?
                 .datetime() // Access as DatetimeChunked
-                .map_err(|e| MeteostatError::PolarsError(e))?; // Handle potential type mismatch
+                .map_err(MeteostatError::PolarsError)?; // Handle potential type mismatch
 
             // Check the time unit of the column
-            let time_unit = match dt_col.time_unit() {
-                TimeUnit::Milliseconds => TimeUnit::Milliseconds,
-                TimeUnit::Nanoseconds => TimeUnit::Nanoseconds, // Handle nanoseconds if used
-                TimeUnit::Microseconds => TimeUnit::Microseconds, // Handle microseconds if used
-            };
+            let time_unit = dt_col.time_unit();
 
             let start_naive = start_utc.naive_utc();
             let end_naive = end_utc.naive_utc();
@@ -709,7 +705,7 @@ mod tests {
         let date_col: &DateChunked = daily_frame
             .column("date")?
             .date() // Access as DateChunked
-            .map_err(|e| MeteostatError::PolarsError(e))?; // Handle potential type mismatch
+            .map_err(MeteostatError::PolarsError)?; // Handle potential type mismatch
 
         for date_opt in date_col.into_iter() {
             if let Some(date_int) = date_opt {
@@ -754,7 +750,7 @@ mod tests {
         let year_col = monthly_frame.column("year")?.i64()?;
         for year_opt in year_col.into_iter() {
             let year = year_opt.unwrap();
-            assert!(year >= 2020 && year <= 2022, "Year {} out of range", year);
+            assert!((2020..=2022).contains(&year), "Year {} out of range", year);
         }
         Ok(())
     }
@@ -821,14 +817,10 @@ mod tests {
             let dt_col: &DatetimeChunked = frame
                 .column("datetime")?
                 .datetime()
-                .map_err(|e| MeteostatError::PolarsError(e))?;
+                .map_err(MeteostatError::PolarsError)?;
 
             // Check the time unit of the column
-            let time_unit = match dt_col.time_unit() {
-                TimeUnit::Milliseconds => TimeUnit::Milliseconds,
-                TimeUnit::Nanoseconds => TimeUnit::Nanoseconds,
-                TimeUnit::Microseconds => TimeUnit::Microseconds,
-            };
+            let time_unit = dt_col.time_unit();
 
             let start_naive = start_utc.naive_utc();
             let end_naive = end_utc.naive_utc();

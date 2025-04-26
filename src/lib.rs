@@ -96,7 +96,7 @@
 //! *   [`Frequency`]: Enum for data granularity (Hourly, Daily, Monthly, Climate).
 //! *   [`Station`]: Struct representing a weather station's metadata.
 //! *   [`MeteostatError`]: The primary error type for the crate.
-//! *   [`LazyFrame`]: Data is returned in this Polars type for efficient processing.
+//! *   [`polars::prelude::LazyFrame`]: Data is returned in this Polars type for efficient processing.
 //! *   [`MeteostatFrameFilterExt`]: Trait providing convenient filtering methods on `LazyFrame`s returned by this crate.
 //!
 //! Check the specific function/method documentation for details on arguments, return types, and potential errors.

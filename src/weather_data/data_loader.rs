@@ -115,7 +115,7 @@ impl WeatherDataLoader {
         decoder
             .read_to_end(&mut decompressed)
             .await
-            .map_err(|e| WeatherDataError::DownloadIo(e))?;
+            .map_err(WeatherDataError::DownloadIo)?;
         info!(
             "Successfully downloaded and decompressed {} bytes for station {}",
             decompressed.len(),

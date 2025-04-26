@@ -65,7 +65,7 @@ fn plot_temperature(data: &DataFrame, output_file: &str) -> Result<(), Box<dyn E
     let plot_data: Vec<(NaiveDateTime, f64)> = dt_col
         .downcast_iter()
         .flat_map(|chunk| chunk.into_iter()) // Get Option<i64> timestamps
-        .zip(temp_col.into_iter()) // Zip with Option<f64> temperatures
+        .zip(temp_col) // Zip with Option<f64> temperatures
         .filter_map(|(dt_opt, temp_opt)| {
             // Keep only pairs where both datetime (ts) and temp are non-null
             // and convert timestamp (assumed ms UTC) to NaiveDateTime

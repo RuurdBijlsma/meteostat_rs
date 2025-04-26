@@ -22,6 +22,6 @@ pub async fn ensure_cache_dir_exists(path: &Path) -> Result<(), io::Error> {
             tokio::fs::create_dir_all(path).await?;
             Ok(())
         }
-        Err(e) => Err(e.into()),
+        Err(e) => Err(e),
     }
 }
