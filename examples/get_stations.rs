@@ -1,22 +1,26 @@
-use meteostat::stations::error::LocateStationError;
-use meteostat::stations::locate_station::StationLocator;
-use meteostat::utils::get_cache_dir;
+use meteostat::error::MeteostatError;
+use meteostat::meteostat::{LatLon, Meteostat};
 
 #[tokio::main]
-async fn main() -> Result<(), LocateStationError> {
+async fn main() -> Result<(), MeteostatError> {
     let lat = 50.0;
     let lon = 5.0;
     let n_results = 5;
-    let max_km = 29.0;
-    let cache_dir = get_cache_dir()?;
+    let max_km = 40.0;
 
-    let db = StationLocator::new(&cache_dir).await?;
-    let nearest = db.query(lat, lon, n_results, max_km, None, None);
+    let meteostat = Meteostat::new().await?;
+    let nearest = meteostat
+        .find_stations()
+        .location(LatLon(lat, lon))
+        .max_distance_km(max_km)
+        .station_limit(n_results)
+        .call()
+        .await?;
+
     println!("\nNearest stations to {} {}", lat, lon);
-    for (station, distance) in nearest {
+    for station in nearest {
         println!(
-            "Distance: {} ID: {}, Name: {:?}",
-            distance,
+            "ID: {}, Name: {:?}",
             station.id,
             station.name.get("en")
         );

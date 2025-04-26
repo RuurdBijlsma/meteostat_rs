@@ -1,10 +1,8 @@
 use chrono::{NaiveDate, TimeZone, Utc};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use meteostat::filtering::MeteostatFrameFilterExt;
-use meteostat::meteostat::{LatLon, Meteostat};
-use meteostat::stations::locate_station::StationLocator;
-use meteostat::types::data_source::Frequency;
-use meteostat::utils::get_cache_dir;
+use meteostat::meteostat::{InventoryRequest, LatLon, Meteostat};
+use meteostat::types::data_source::{Frequency, RequiredData};
 use tokio::runtime::Runtime;
 
 fn bench(c: &mut Criterion) {
@@ -41,10 +39,7 @@ fn bench(c: &mut Criterion) {
             rt.block_on(async {
                 let _ = meteostat
                     .from_location()
-                    .location(black_box(LatLon {
-                        lat: 50.0,
-                        lon: 5.0,
-                    }))
+                    .location(black_box(LatLon(50.038, 8.559)))
                     .frequency(black_box(Frequency::Hourly))
                     .call()
                     .await
@@ -58,10 +53,7 @@ fn bench(c: &mut Criterion) {
             rt.block_on(async {
                 let _ = meteostat
                     .from_location()
-                    .location(black_box(LatLon {
-                        lat: 50.038,
-                        lon: 8.559,
-                    }))
+                    .location(black_box(LatLon(50.038, 8.559)))
                     .frequency(black_box(Frequency::Daily))
                     .call()
                     .await
@@ -75,10 +67,7 @@ fn bench(c: &mut Criterion) {
             rt.block_on(async {
                 let _ = meteostat
                     .from_location()
-                    .location(black_box(LatLon {
-                        lat: 50.038,
-                        lon: 8.559,
-                    }))
+                    .location(black_box(LatLon(50.038, 8.559)))
                     .frequency(black_box(Frequency::Monthly))
                     .call()
                     .await
@@ -92,10 +81,7 @@ fn bench(c: &mut Criterion) {
             rt.block_on(async {
                 let _ = meteostat
                     .from_location()
-                    .location(black_box(LatLon {
-                        lat: 50.038,
-                        lon: 8.559,
-                    }))
+                    .location(black_box(LatLon(50.038, 8.559)))
                     .frequency(black_box(Frequency::Climate))
                     .call()
                     .await
@@ -112,10 +98,7 @@ fn bench(c: &mut Criterion) {
 
                 let lazy_frame = meteostat
                     .from_location()
-                    .location(black_box(LatLon {
-                        lat: 50.038,
-                        lon: 8.559,
-                    }))
+                    .location(black_box(LatLon(50.038, 8.559)))
                     .frequency(black_box(Frequency::Hourly))
                     .call()
                     .await
@@ -135,10 +118,7 @@ fn bench(c: &mut Criterion) {
 
                 let lazy_frame = meteostat
                     .from_location()
-                    .location(black_box(LatLon {
-                        lat: 50.038,
-                        lon: 8.559,
-                    }))
+                    .location(black_box(LatLon(50.038, 8.559)))
                     .frequency(black_box(Frequency::Daily))
                     .call()
                     .await
@@ -155,10 +135,7 @@ fn bench(c: &mut Criterion) {
             rt.block_on(async {
                 let lazy_frame = meteostat
                     .from_location()
-                    .location(black_box(LatLon {
-                        lat: 50.038,
-                        lon: 8.559,
-                    }))
+                    .location(black_box(LatLon(50.038, 8.559)))
                     .frequency(black_box(Frequency::Monthly))
                     .call()
                     .await
@@ -175,10 +152,7 @@ fn bench(c: &mut Criterion) {
             rt.block_on(async {
                 let lazy_frame = meteostat
                     .from_location()
-                    .location(black_box(LatLon {
-                        lat: 50.038,
-                        lon: 8.559,
-                    }))
+                    .location(black_box(LatLon(50.038, 8.559)))
                     .frequency(black_box(Frequency::Climate))
                     .call()
                     .await
@@ -193,28 +167,20 @@ fn bench(c: &mut Criterion) {
         });
     });
 
-    let cache_dir = get_cache_dir().unwrap();
-
-    c.bench_function("StationCache::init", |b| {
+    c.bench_function("meteostat.find_stations", |b| {
         b.iter(|| {
             rt.block_on(async {
-                StationLocator::new(&cache_dir).await.unwrap();
-            });
-        });
-    });
-
-    let station_cache = rt.block_on(async { StationLocator::new(&cache_dir).await.unwrap() });
-    c.bench_function("station_cache.query", |b| {
-        b.iter(|| {
-            rt.block_on(async {
-                station_cache.query(
-                    black_box(50.),
-                    black_box(5.),
-                    black_box(5),
-                    black_box(30.0),
-                    black_box(None),
-                    black_box(None),
-                )
+                let _stations = meteostat
+                    .find_stations()
+                    .location(black_box(LatLon(50.038, 8.559)))
+                    .station_limit(black_box(3))
+                    .inventory_request(black_box(InventoryRequest::new(
+                        Frequency::Hourly,
+                        RequiredData::Year(2020),
+                    )))
+                    .call()
+                    .await
+                    .unwrap();
             });
         });
     });

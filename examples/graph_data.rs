@@ -7,15 +7,14 @@
 //! cargo run --example graph_data --features plotting
 
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
-use std::error::Error;
 use meteostat::filtering::MeteostatFrameFilterExt;
 use meteostat::meteostat::{LatLon, Meteostat};
 use meteostat::types::data_source::Frequency;
+use std::error::Error;
 
 use plotters::coord::types::RangedDateTime;
 use plotters::prelude::*;
 use polars::prelude::*;
-
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -25,10 +24,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let meteostat = Meteostat::new().await?;
 
     // 2. Define location and time range
-    let location = LatLon {
-        lat: 52.118641, // Example: De Bilt, Netherlands
-        lon: 5.185589,
-    };
+    let location = LatLon(52.118641, 5.185589); // de Bilt
     let start_utc = Utc.with_ymd_and_hms(2023, 1, 1, 0, 0, 0).unwrap();
     let end_utc = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
 
@@ -61,7 +57,7 @@ fn plot_temperature(data: &DataFrame, output_file: &str) -> Result<(), Box<dyn E
     let dt_col = data
         .column("datetime")
         .expect("DataFrame should contain 'datetime' column")
-        .datetime()?; 
+        .datetime()?;
     let temp_col = data
         .column("temp")
         .expect("DataFrame should contain 'temp' column")
@@ -76,7 +72,9 @@ fn plot_temperature(data: &DataFrame, output_file: &str) -> Result<(), Box<dyn E
             // Keep only pairs where both datetime (ts) and temp are non-null
             // and convert timestamp (assumed ms UTC) to NaiveDateTime
             match (dt_opt, temp_opt) {
-                (Some(ts), Some(temp)) => timestamp_ms_to_naive_utc(*ts).map(|naive_dt| (naive_dt, temp)),
+                (Some(ts), Some(temp)) => {
+                    timestamp_ms_to_naive_utc(*ts).map(|naive_dt| (naive_dt, temp))
+                }
                 _ => None,
             }
         })
@@ -88,19 +86,23 @@ fn plot_temperature(data: &DataFrame, output_file: &str) -> Result<(), Box<dyn E
 
     // Find data ranges for axes
     // This assumes plot_data is not empty, checked above.
-    let (min_dt, max_dt) = plot_data.iter().fold(
-        (plot_data[0].0, plot_data[0].0),
-        |(min, max), (dt, _)| (min.min(*dt), max.max(*dt)),
-    );
+    let (min_dt, max_dt) = plot_data
+        .iter()
+        .fold((plot_data[0].0, plot_data[0].0), |(min, max), (dt, _)| {
+            (min.min(*dt), max.max(*dt))
+        });
     let (min_temp, max_temp) = plot_data.iter().fold(
         (f64::INFINITY, f64::NEG_INFINITY),
         |(min, max), (_, temp)| (min.min(*temp), max.max(*temp)),
     );
     // Add a little padding to the y-axis if min/max are different
-    let y_padding = if (max_temp - min_temp).abs() > 1e-6 { (max_temp - min_temp) * 0.1 } else { 1.0 };
+    let y_padding = if (max_temp - min_temp).abs() > 1e-6 {
+        (max_temp - min_temp) * 0.1
+    } else {
+        1.0
+    };
     let y_axis_start = min_temp - y_padding;
     let y_axis_end = max_temp + y_padding;
-
 
     let mut chart = ChartBuilder::on(&root)
         .caption(

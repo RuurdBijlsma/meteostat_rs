@@ -96,7 +96,7 @@ impl Meteostat {
         frequency: Frequency,
         max_distance_km: Option<f64>,
         station_limit: Option<usize>,
-        required_date: Option<RequiredData>,
+        required_data: Option<RequiredData>,
     ) -> Result<LazyFrame, MeteostatError> {
         let max_distance_km = max_distance_km.unwrap_or(50.0);
         let stations_limit = station_limit.unwrap_or(1);
@@ -108,7 +108,7 @@ impl Meteostat {
             stations_limit,
             max_distance_km,
             Some(frequency),
-            required_date,
+            required_data,
         );
 
         // Handle case where no stations are found within the radius

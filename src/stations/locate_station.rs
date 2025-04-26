@@ -160,7 +160,7 @@ impl StationLocator {
         n_results: usize,
         max_distance_km: f64,
         frequency: Option<Frequency>,
-        required_date: Option<RequiredData>,
+        required_data: Option<RequiredData>,
     ) -> Vec<(Station, f64)> {
         if n_results == 0 {
             return vec![];
@@ -180,7 +180,7 @@ impl StationLocator {
             n_results,
             max_distance_km,
             frequency.unwrap(),
-            required_date,
+            required_data,
         )
     }
 
