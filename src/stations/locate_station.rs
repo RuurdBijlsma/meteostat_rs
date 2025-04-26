@@ -399,7 +399,7 @@ impl StationLocator {
                 let req_e_y = req_e.year();
                 inv_start_y <= req_s_y && inv_end_y >= req_e_y
             }
-            RequiredData::Year(year)=> {
+            RequiredData::Year(year) => {
                 let req_y = *year;
                 inv_start_y <= req_y && req_y <= inv_end_y
             }

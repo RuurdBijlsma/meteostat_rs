@@ -1,8 +1,8 @@
+use crate::stations::error::LocateStationError;
 use crate::types::data_source::Frequency;
 use crate::weather_data::error::WeatherDataError;
 use std::path::PathBuf;
 use thiserror::Error;
-use crate::stations::error::LocateStationError;
 
 #[derive(Debug, Error)]
 pub enum MeteostatError {

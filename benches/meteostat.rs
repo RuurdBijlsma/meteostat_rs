@@ -1,7 +1,9 @@
 use chrono::{NaiveDate, TimeZone, Utc};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use meteostat::{
+    Frequency, InventoryRequest, LatLon, Meteostat, MeteostatFrameFilterExt, RequiredData,
+};
 use tokio::runtime::Runtime;
-use meteostat::{Frequency, InventoryRequest, LatLon, Meteostat, MeteostatFrameFilterExt, RequiredData};
 
 fn bench(c: &mut Criterion) {
     let station_str = "10637";

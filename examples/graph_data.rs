@@ -9,10 +9,10 @@
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use std::error::Error;
 
+use meteostat::{Frequency, LatLon, Meteostat, MeteostatFrameFilterExt};
 use plotters::coord::types::RangedDateTime;
 use plotters::prelude::*;
 use polars::prelude::*;
-use meteostat::{Frequency, LatLon, Meteostat, MeteostatFrameFilterExt};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {

@@ -98,7 +98,7 @@ pub enum WeatherDataError {
         station: String,
         source: PolarsError,
     },
-    
+
     #[error("Missing required column '{column}' for station {station}")]
     MissingColumnError { station: String, column: String },
 }
