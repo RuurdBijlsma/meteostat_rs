@@ -50,7 +50,7 @@ pub struct LatLon(pub f64, pub f64);
 ///
 /// // Request stations with monthly data covering a specific range
 /// let start_date = NaiveDate::from_ymd_opt(2020, 1, 1).unwrap();
-/// let end_date = NaiveDate::from_ymd_opt(2020, 6, 31).unwrap();
+/// let end_date = NaiveDate::from_ymd_opt(2020, 6, 30).unwrap();
 /// let req_monthly_range = InventoryRequest::new(
 ///     Frequency::Monthly,
 ///     RequiredData::DateRange { start: start_date, end: end_date }

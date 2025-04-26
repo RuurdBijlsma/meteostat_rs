@@ -1,102 +1,481 @@
+//! This module provides extension traits for filtering Polars `LazyFrame`s
+//! obtained from the `meteostat` crate, offering convenient methods for
+//! common date and time-based filtering operations specific to Meteostat data structures.
+
 use crate::types::into_utc_trait::IntoUtcDateTime;
 use chrono::{Duration, NaiveDate, Timelike};
 use polars::prelude::{col, lit, LazyFrame};
 
+/// Extension trait providing Meteostat-specific filtering methods for Polars `LazyFrame`s.
+///
+/// These methods simplify common filtering tasks based on dates, times, and years,
+/// assuming the standard column names and types produced by the `meteostat` crate
+/// for different data frequencies (e.g., "datetime", "date", "year", "month").
 pub trait MeteostatFrameFilterExt {
-    /// Filters an hourly LazyFrame by a UTC datetime range (inclusive).
-    /// Assumes the 'date' column is 'YYYY-MM-DD' and 'hour' column is integer hour.
+    /// Filters an hourly `LazyFrame` by a datetime range (inclusive).
+    ///
+    /// Assumes the `LazyFrame` contains a "datetime" column of type `DataType::Datetime`.
+    /// The provided start and end datetimes are converted to UTC internally.
     ///
     /// # Arguments
-    /// * `start`: The start DateTime (inclusive).
-    /// * `end`: The end DateTime (inclusive).
+    ///
+    /// * `start`: The start `DateTime` (inclusive). Accepts any type implementing [`IntoUtcDateTime`].
+    /// * `end`: The end `DateTime` (inclusive). Accepts any type implementing [`IntoUtcDateTime`].
     ///
     /// # Returns
-    /// A new `LazyFrame` with the filter applied. Potential parsing errors
-    /// occur during execution (e.g., `collect`).
+    ///
+    /// A new `LazyFrame` with the filter expression applied. Data validation or errors related
+    /// to column existence/type occur during execution (e.g., `collect()`).
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use meteostat::{Meteostat, Frequency, MeteostatError, MeteostatFrameFilterExt};
+    /// # use polars::prelude::*;
+    /// # use chrono::{Utc, TimeZone};
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), MeteostatError> {
+    /// # let client = Meteostat::new().await?;
+    /// # let station_id = "10637"; // Use a station likely to have recent data
+    /// // Assume `lazy_hourly_frame` is obtained from client.from_station() or client.from_location()
+    /// let lazy_hourly_frame = client.from_station()
+    ///     .station(station_id)
+    ///     .frequency(Frequency::Hourly)
+    ///     .call()
+    ///     .await?;
+    ///
+    /// // Define the time range in UTC
+    /// let start_dt = Utc.with_ymd_and_hms(2023, 10, 26, 8, 0, 0).unwrap(); // 8:00 AM UTC
+    /// let end_dt = Utc.with_ymd_and_hms(2023, 10, 26, 17, 59, 59).unwrap(); // Up to 5:59:59 PM UTC
+    ///
+    /// // Apply the filter
+    /// let filtered_lf = lazy_hourly_frame.filter_hourly(start_dt, end_dt);
+    ///
+    /// // Collect the results (errors during collect are possible)
+    /// let filtered_df = filtered_lf.collect()?;
+    ///
+    /// println!("Hourly data between {} and {}:\n{}", start_dt, end_dt, filtered_df.head(Some(5)));
+    /// // Further checks could assert that all 'datetime' values fall within the range.
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
     fn filter_hourly(
         self,
         start: impl IntoUtcDateTime + Clone,
         end: impl IntoUtcDateTime + Clone,
     ) -> LazyFrame;
 
-    /// Filters a daily LazyFrame by a NaiveDate range (inclusive).
-    /// Assumes the 'date' column is 'YYYY-MM-DD'.
+    /// Filters a daily `LazyFrame` by a `NaiveDate` range (inclusive).
+    ///
+    /// Assumes the `LazyFrame` contains a "date" column of type `DataType::Date`.
     ///
     /// # Arguments
-    /// * `start_date`: The start NaiveDate (inclusive).
-    /// * `end_date`: The end NaiveDate (inclusive).
+    ///
+    /// * `start_date`: The start `NaiveDate` (inclusive).
+    /// * `end_date`: The end `NaiveDate` (inclusive).
     ///
     /// # Returns
-    /// A new `LazyFrame` with the filter applied. Potential parsing errors
-    /// occur during execution (e.g., `collect`).
-    fn filter_daily(self, start_date: NaiveDate, end_date: NaiveDate) -> LazyFrame; // Changed return type - error handling happens on collect
+    ///
+    /// A new `LazyFrame` with the filter expression applied. Data validation or errors related
+    /// to column existence/type occur during execution (e.g., `collect()`).
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use meteostat::{Meteostat, Frequency, MeteostatError, MeteostatFrameFilterExt};
+    /// # use polars::prelude::*;
+    /// # use chrono::NaiveDate;
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), MeteostatError> {
+    /// # let client = Meteostat::new().await?;
+    /// # let station_id = "10637";
+    /// // Assume `lazy_daily_frame` is obtained from the client
+    /// let lazy_daily_frame = client.from_station()
+    ///     .station(station_id)
+    ///     .frequency(Frequency::Daily)
+    ///     .call()
+    ///     .await?;
+    ///
+    /// // Define the date range
+    /// let start_date = NaiveDate::from_ymd_opt(2023, 1, 1).unwrap();
+    /// let end_date = NaiveDate::from_ymd_opt(2023, 3, 31).unwrap(); // First quarter
+    ///
+    /// // Apply the filter
+    /// let filtered_lf = lazy_daily_frame.filter_daily(start_date, end_date);
+    ///
+    /// // Collect the results
+    /// let filtered_df = filtered_lf.collect()?;
+    ///
+    /// println!("Daily data between {} and {}:\n{}", start_date, end_date, filtered_df.head(Some(5)));
+    /// // Further checks could assert that all 'date' values fall within the range.
+    /// # Ok(())
+    /// # }
+    /// ```
+    fn filter_daily(self, start_date: NaiveDate, end_date: NaiveDate) -> LazyFrame;
 
-    /// Filters a monthly LazyFrame by a year range (inclusive).
-    /// Assumes 'year' and 'month' columns exist.
+    /// Filters a daily `LazyFrame` to include only records from a specific year.
+    ///
+    /// This is a convenience wrapper around [`filter_daily`].
+    /// Assumes the `LazyFrame` contains a "date" column of type `DataType::Date`.
     ///
     /// # Arguments
+    ///
+    /// * `year`: The year to filter by.
+    ///
+    /// # Returns
+    ///
+    /// A new `LazyFrame` with the filter expression applied, or an error if the year is invalid
+    /// for creating `NaiveDate` boundaries. Data validation or errors related
+    /// to column existence/type occur during execution (e.g., `collect()`).
+    ///
+    /// # Errors
+    ///
+    /// Can return `polars::error::PolarsError` immediately if the provided `year`
+    /// results in an invalid date calculation (highly unlikely for typical years).
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use meteostat::{Meteostat, Frequency, MeteostatError, MeteostatFrameFilterExt};
+    /// # use polars::prelude::*;
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), MeteostatError> {
+    /// # let client = Meteostat::new().await?;
+    /// # let station_id = "10637";
+    /// // Assume `lazy_daily_frame` is obtained from the client
+    /// let lazy_daily_frame = client.from_station()
+    ///     .station(station_id)
+    ///     .frequency(Frequency::Daily)
+    ///     .call()
+    ///     .await?;
+    ///
+    /// // Filter for the year 2022
+    /// let filtered_lf = lazy_daily_frame.filter_daily_by_year(2022)?;
+    ///
+    /// // Collect the results
+    /// let filtered_df = filtered_lf.collect()?;
+    ///
+    /// println!("Daily data for the year 2022:\n{}", filtered_df.head(Some(5)));
+    /// // Further checks could assert that all 'date' values are within 2022.
+    /// # Ok(())
+    /// # }
+    /// ```
+    fn filter_daily_by_year(self, year: i32) -> Result<LazyFrame, polars::error::PolarsError>;
+
+    /// Filters a monthly `LazyFrame` by a year range (inclusive).
+    ///
+    /// Assumes the `LazyFrame` contains "year" and "month" columns, where "year"
+    /// is of a numeric type (e.g., `DataType::Int64`).
+    ///
+    /// # Arguments
+    ///
     /// * `start_year`: The start year (inclusive).
     /// * `end_year`: The end year (inclusive).
     ///
     /// # Returns
-    /// A new `LazyFrame` with the filter applied.
+    ///
+    /// A new `LazyFrame` with the filter expression applied. Data validation or errors related
+    /// to column existence/type occur during execution (e.g., `collect()`).
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use meteostat::{Meteostat, Frequency, MeteostatError, MeteostatFrameFilterExt};
+    /// # use polars::prelude::*;
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), MeteostatError> {
+    /// # let client = Meteostat::new().await?;
+    /// # let station_id = "10637";
+    /// // Assume `lazy_monthly_frame` is obtained from the client
+    /// let lazy_monthly_frame = client.from_station()
+    ///     .station(station_id)
+    ///     .frequency(Frequency::Monthly)
+    ///     .call()
+    ///     .await?;
+    ///
+    /// // Filter for years 2018 through 2022
+    /// let filtered_lf = lazy_monthly_frame.filter_monthly(2018, 2022);
+    ///
+    /// // Collect the results
+    /// let filtered_df = filtered_lf.collect()?;
+    ///
+    /// println!("Monthly data from 2018 to 2022:\n{}", filtered_df.head(Some(5)));
+    /// // Further checks could assert that all 'year' values fall within the range.
+    /// # Ok(())
+    /// # }
+    /// ```
     fn filter_monthly(self, start_year: i32, end_year: i32) -> LazyFrame;
 
-    /// Filters a climate LazyFrame by a year range (inclusive).
-    /// Filters records where the record's period [record_start_year, record_end_year]
-    /// is fully contained within the provided `start_year` and `end_year`.
-    /// Assumes 'start_year' and 'end_year' columns exist.
+    /// Filters a climate `LazyFrame` by a climate period range.
+    ///
+    /// Selects records where the climate period defined by the record's "start_year"
+    /// and "end_year" columns is *fully contained within* the provided `start_year`
+    /// and `end_year` arguments.
+    ///
+    /// Assumes the `LazyFrame` contains numeric "start_year" and "end_year" columns.
     ///
     /// # Arguments
+    ///
     /// * `start_year`: The start year of the desired range (inclusive).
     /// * `end_year`: The end year of the desired range (inclusive).
     ///
     /// # Returns
-    /// A new `LazyFrame` with the filter applied.
+    ///
+    /// A new `LazyFrame` with the filter expression applied. Data validation or errors related
+    /// to column existence/type occur during execution (e.g., `collect()`).
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use meteostat::{Meteostat, Frequency, MeteostatError, MeteostatFrameFilterExt};
+    /// # use polars::prelude::*;
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), MeteostatError> {
+    /// # let client = Meteostat::new().await?;
+    /// # let station_id = "10637";
+    /// // Assume `lazy_climate_frame` is obtained from the client
+    /// let lazy_climate_frame = client.from_station()
+    ///     .station(station_id)
+    ///     .frequency(Frequency::Climate)
+    ///     .call()
+    ///     .await?;
+    ///
+    /// // Find climate normal periods that fall entirely within 1981-2010
+    /// // (This would typically only match a '1981-2010' record if one exists)
+    /// let filtered_lf = lazy_climate_frame.filter_climate(1981, 2010);
+    ///
+    /// // Collect the results
+    /// let filtered_df = filtered_lf.collect()?;
+    ///
+    /// println!("Climate data for periods within 1981-2010:\n{}", filtered_df);
+    /// // Expect 0 or 12 rows if the exact 1981-2010 period exists.
+    /// # Ok(())
+    /// # }
+    /// ```
     fn filter_climate(self, start_year: i32, end_year: i32) -> LazyFrame;
 
-    /// Gets a single row from an hourly LazyFrame matching the hour closest
+    /// Gets a single row from an hourly `LazyFrame` matching the hour closest
     /// to the specific UTC datetime provided.
-    /// Rounds the input datetime to the nearest hour
-    /// (e.g., 12:30 rounds up to 13:00, 12:29 rounds down to 12:00).
     ///
+    /// Rounds the input `datetime` to the nearest hour before filtering:
+    /// - Minutes 00-29 round down to the current hour (e.g., 12:29 -> 12:00).
+    /// - Minutes 30-59 round up to the next hour (e.g., 12:30 -> 13:00).
     ///
+    /// Assumes the `LazyFrame` contains a "datetime" column of type `DataType::Datetime`.
     ///
     /// # Arguments
-    /// * `datetime`: The UTC DateTime to find the nearest hourly record for.
+    ///
+    /// * `datetime`: The UTC `DateTime` to find the nearest hourly record for.
+    ///               Accepts any type implementing [`IntoUtcDateTime`].
     ///
     /// # Returns
-    /// A new `LazyFrame` containing the matching row (or zero rows if not found).
+    ///
+    /// A new `LazyFrame` containing at most one row matching the rounded datetime.
+    /// It will contain zero rows if no exact match is found for the rounded hour.
+    /// Data validation or errors related to column existence/type occur during
+    /// execution (e.g., `collect()`).
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use meteostat::{Meteostat, Frequency, MeteostatError, MeteostatFrameFilterExt};
+    /// # use polars::prelude::*;
+    /// # use chrono::{Utc, TimeZone};
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), MeteostatError> {
+    /// # let client = Meteostat::new().await?;
+    /// # let station_id = "10637";
+    /// // Assume `lazy_hourly_frame` is obtained from the client
+    /// let lazy_hourly_frame = client.from_station()
+    ///     .station(station_id)
+    ///     .frequency(Frequency::Hourly)
+    ///     .call()
+    ///     .await?;
+    ///
+    /// // Target time: 2023-10-26 14:45:00 UTC (will round up to 15:00)
+    /// let target_dt = Utc.with_ymd_and_hms(2023, 10, 26, 14, 45, 0).unwrap();
+    ///
+    /// // Get the row closest to the target time
+    /// let closest_row_lf = lazy_hourly_frame.get_hourly_row(target_dt);
+    ///
+    /// // Collect the result
+    /// let closest_row_df = closest_row_lf.collect()?;
+    ///
+    /// println!("Hourly row nearest {}:\n{}", target_dt, closest_row_df);
+    /// assert!(closest_row_df.height() <= 1); // Should be 0 or 1 row
+    ///
+    /// // If a row was found, check its datetime (should be 15:00:00)
+    /// if closest_row_df.height() == 1 {
+    ///     let result_dt_series = closest_row_df.column("datetime")?.datetime()?;
+    ///     let result_ts = result_dt_series.get(0).unwrap();
+    ///     let result_dt_utc = chrono::DateTime::<Utc>::from_timestamp_nanos(result_ts);
+    ///     println!("Result datetime: {}", result_dt_utc);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
     fn get_hourly_row(self, datetime: impl IntoUtcDateTime + Clone) -> LazyFrame;
 
-    /// Gets a single row from a daily LazyFrame matching a specific NaiveDate.
+    /// Gets a single row from a daily `LazyFrame` matching a specific `NaiveDate`.
+    ///
+    /// Assumes the `LazyFrame` contains a "date" column of type `DataType::Date`.
     ///
     /// # Arguments
-    /// * `date`: The exact NaiveDate to match.
+    ///
+    /// * `date`: The exact `NaiveDate` to match.
     ///
     /// # Returns
-    /// A new `LazyFrame` containing the matching row (or zero rows if not found).
+    ///
+    /// A new `LazyFrame` containing at most one row matching the date.
+    /// It will contain zero rows if no exact match is found.
+    /// Data validation or errors related to column existence/type occur during
+    /// execution (e.g., `collect()`).
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use meteostat::{Meteostat, Frequency, MeteostatError, MeteostatFrameFilterExt};
+    /// # use polars::prelude::*;
+    /// # use chrono::NaiveDate;
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), MeteostatError> {
+    /// # let client = Meteostat::new().await?;
+    /// # let station_id = "10637";
+    /// // Assume `lazy_daily_frame` is obtained from the client
+    /// let lazy_daily_frame = client.from_station()
+    ///     .station(station_id)
+    ///     .frequency(Frequency::Daily)
+    ///     .call()
+    ///     .await?;
+    ///
+    /// // Target date
+    /// let target_date = NaiveDate::from_ymd_opt(2023, 10, 26).unwrap();
+    ///
+    /// // Get the specific row
+    /// let daily_row_lf = lazy_daily_frame.get_daily_row(target_date);
+    ///
+    /// // Collect the result
+    /// let daily_row_df = daily_row_lf.collect()?;
+    ///
+    /// println!("Daily row for {}:\n{}", target_date, daily_row_df);
+    /// assert!(daily_row_df.height() <= 1);
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
     fn get_daily_row(self, date: NaiveDate) -> LazyFrame;
 
-    /// Gets a single row from a monthly LazyFrame matching a specific year and month.
+    /// Gets a single row from a monthly `LazyFrame` matching a specific year and month.
+    ///
+    /// Assumes the `LazyFrame` contains numeric "year" and "month" columns.
     ///
     /// # Arguments
+    ///
     /// * `year`: The exact year to match.
     /// * `month`: The exact month (1-12) to match.
     ///
     /// # Returns
-    /// A new `LazyFrame` containing the matching row (or zero rows if not found).
+    ///
+    /// A new `LazyFrame` containing at most one row matching the year and month.
+    /// It will contain zero rows if no exact match is found.
+    /// Data validation or errors related to column existence/type occur during
+    /// execution (e.g., `collect()`).
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use meteostat::{Meteostat, Frequency, MeteostatError, MeteostatFrameFilterExt};
+    /// # use polars::prelude::*;
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), MeteostatError> {
+    /// # let client = Meteostat::new().await?;
+    /// # let station_id = "10637";
+    /// // Assume `lazy_monthly_frame` is obtained from the client
+    /// let lazy_monthly_frame = client.from_station()
+    ///     .station(station_id)
+    ///     .frequency(Frequency::Monthly)
+    ///     .call()
+    ///     .await?;
+    ///
+    /// // Target year and month (e.g., July 2023)
+    /// let target_year = 2023;
+    /// let target_month = 7;
+    ///
+    /// // Get the specific row
+    /// let monthly_row_lf = lazy_monthly_frame.get_monthly_row(target_year, target_month);
+    ///
+    /// // Collect the result
+    /// let monthly_row_df = monthly_row_lf.collect()?;
+    ///
+    /// println!("Monthly row for {}-{}:\n{}", target_year, target_month, monthly_row_df);
+    /// assert!(monthly_row_df.height() <= 1);
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
     fn get_monthly_row(self, year: i32, month: u32) -> LazyFrame;
 
-    /// Gets a single row from a climate LazyFrame matching a specific climate period and month.
+    /// Gets a single row from a climate `LazyFrame` matching a specific climate period and month.
+    ///
+    /// Assumes the `LazyFrame` contains numeric "start_year", "end_year", and "month" columns.
     ///
     /// # Arguments
+    ///
     /// * `start_year`: The start year of the climate period to match.
     /// * `end_year`: The end year of the climate period to match.
     /// * `month`: The exact month (1-12) within the period to match.
     ///
     /// # Returns
-    /// A new `LazyFrame` containing the matching row (or zero rows if not found).
+    ///
+    /// A new `LazyFrame` containing at most one row matching the period and month.
+    /// It will contain zero rows if no exact match is found.
+    /// Data validation or errors related to column existence/type occur during
+    /// execution (e.g., `collect()`).
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use meteostat::{Meteostat, Frequency, MeteostatError, MeteostatFrameFilterExt};
+    /// # use polars::prelude::*;
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), MeteostatError> {
+    /// # let client = Meteostat::new().await?;
+    /// # let station_id = "10637"; // Use a station likely to have climate data
+    /// // Assume `lazy_climate_frame` is obtained from the client
+    /// let lazy_climate_frame = client.from_station()
+    ///     .station(station_id)
+    ///     .frequency(Frequency::Climate)
+    ///     .call()
+    ///     .await?;
+    ///
+    /// // Target climate period and month (e.g., January for 1991-2020 normals)
+    /// let target_start_year = 1991;
+    /// let target_end_year = 2020;
+    /// let target_month = 1; // January
+    ///
+    /// // Get the specific row
+    /// let climate_row_lf = lazy_climate_frame.get_climate_row(target_start_year, target_end_year, target_month);
+    ///
+    /// // Collect the result
+    /// let climate_row_df = climate_row_lf.collect()?;
+    ///
+    /// println!("Climate row for {}-{} month {}:\n{}", target_start_year, target_end_year, target_month, climate_row_df);
+    /// // This will have 0 rows if the 1991-2020 normals don't exist for this station
+    /// assert!(climate_row_df.height() <= 1);
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
     fn get_climate_row(self, start_year: i32, end_year: i32, month: u32) -> LazyFrame;
 }
 
@@ -111,15 +490,12 @@ impl MeteostatFrameFilterExt for LazyFrame {
 
         self.filter(
             col("datetime")
-                .gt_eq(lit(start_naive)) // No cast
-                .and(
-                    col("datetime").lt_eq(lit(end_naive)), // No cast
-                ),
+                .gt_eq(lit(start_naive))
+                .and(col("datetime").lt_eq(lit(end_naive))),
         )
     }
 
     fn filter_daily(self, start_date: NaiveDate, end_date: NaiveDate) -> LazyFrame {
-        // Filter directly on the pre-parsed 'date' column (which is now DataType::Date)
         self.filter(
             col("date")
                 .gt_eq(lit(start_date))
@@ -127,18 +503,24 @@ impl MeteostatFrameFilterExt for LazyFrame {
         )
     }
 
+    fn filter_daily_by_year(self, year: i32) -> Result<LazyFrame, polars::error::PolarsError> {
+        let start_date = NaiveDate::from_ymd_opt(year, 1, 1)
+            .ok_or_else(|| polars::error::PolarsError::ComputeError(format!("Invalid start date for year {}", year).into()))?;
+        let end_date = NaiveDate::from_ymd_opt(year, 12, 31)
+            .ok_or_else(|| polars::error::PolarsError::ComputeError(format!("Invalid end date for year {}", year).into()))?;
+        Ok(self.filter_daily(start_date, end_date))
+    }
+
     fn filter_monthly(self, start_year: i32, end_year: i32) -> LazyFrame {
-        // Filter directly on the 'year' column
         self.filter(
             col("year")
-                .gt_eq(lit(start_year as i64)) // Greater than or equal to start year
-                .and(col("year").lt_eq(lit(end_year as i64))), // Less than or equal to end year
+                .gt_eq(lit(start_year as i64)) // Polars might use i64 internally
+                .and(col("year").lt_eq(lit(end_year as i64))),
         )
     }
 
     fn filter_climate(self, start_year: i32, end_year: i32) -> LazyFrame {
-        // Filter rows where the climate period [record_start_year, record_end_year]
-        // is fully contained within [start_year, end_year].
+        // Assume 'start_year' and 'end_year' columns exist and are numeric
         self.filter(
             col("start_year")
                 .gt_eq(lit(start_year as i64))
@@ -152,12 +534,10 @@ impl MeteostatFrameFilterExt for LazyFrame {
         // Round to the nearest hour
         let rounded_hour_start_utc = if input_utc.minute() >= 30 {
             // Round up: Add an hour, then truncate minutes/seconds/nanos
-            // Using Duration::hours handles potential day/month/year rollovers
             (input_utc + Duration::hours(1))
                 .with_minute(0)
                 .and_then(|dt| dt.with_second(0))
                 .and_then(|dt| dt.with_nanosecond(0))
-                // Setting 0 for minute/second/nanosecond is always valid
                 .expect("Truncating to start of hour after adding hour failed unexpectedly")
         } else {
             // Round down: Truncate minutes/seconds/nanos
@@ -165,7 +545,6 @@ impl MeteostatFrameFilterExt for LazyFrame {
                 .with_minute(0)
                 .and_then(|dt| dt.with_second(0))
                 .and_then(|dt| dt.with_nanosecond(0))
-                // Setting 0 for minute/second/nanosecond is always valid
                 .expect("Truncating to start of hour failed unexpectedly")
         };
 
@@ -177,14 +556,14 @@ impl MeteostatFrameFilterExt for LazyFrame {
     }
 
     fn get_daily_row(self, date: NaiveDate) -> LazyFrame {
-        self.filter(col("date").eq(lit(date))) // Use exact equality
+        self.filter(col("date").eq(lit(date)))
     }
 
     fn get_monthly_row(self, year: i32, month: u32) -> LazyFrame {
         self.filter(
             col("year")
                 .eq(lit(year as i64))
-                .and(col("month").eq(lit(month as i64))), // Match both year and month
+                .and(col("month").eq(lit(month as i64))), // Use i64 assuming Polars internal type
         )
     }
 
@@ -193,7 +572,7 @@ impl MeteostatFrameFilterExt for LazyFrame {
             col("start_year")
                 .eq(lit(start_year as i64))
                 .and(col("end_year").eq(lit(end_year as i64)))
-                .and(col("month").eq(lit(month as i64))), // Match start_year, end_year, and month
+                .and(col("month").eq(lit(month as i64))),
         )
     }
 }
