@@ -7,14 +7,12 @@
 //! cargo run --example graph_data --features plotting
 
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
-use meteostat::filtering::MeteostatFrameFilterExt;
-use meteostat::meteostat::{LatLon, Meteostat};
-use meteostat::types::data_source::Frequency;
 use std::error::Error;
 
 use plotters::coord::types::RangedDateTime;
 use plotters::prelude::*;
 use polars::prelude::*;
+use meteostat::{Frequency, LatLon, Meteostat, MeteostatFrameFilterExt};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {

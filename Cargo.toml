@@ -41,7 +41,7 @@ thiserror = "2.0.12"
 log = "0.4.27"
 bon = "3.6.3"
 ordered-float = "5.0.0"
-# Optional:
+# Only for one of the examples:
 plotters = { version = "0.3.7", optional = true }
 
 

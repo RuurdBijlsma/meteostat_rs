@@ -1,5 +1,4 @@
-use meteostat::error::MeteostatError;
-use meteostat::meteostat::{LatLon, Meteostat};
+use meteostat::{LatLon, Meteostat, MeteostatError};
 
 #[tokio::main]
 async fn main() -> Result<(), MeteostatError> {

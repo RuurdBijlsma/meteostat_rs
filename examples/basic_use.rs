@@ -1,9 +1,6 @@
 use chrono::{TimeZone, Utc};
-use meteostat::error::MeteostatError;
-use meteostat::filtering::MeteostatFrameFilterExt;
-use meteostat::meteostat::{LatLon, Meteostat};
-use meteostat::types::data_source::{Frequency, RequiredData};
 use std::env;
+use meteostat::{Frequency, LatLon, Meteostat, MeteostatError, MeteostatFrameFilterExt, RequiredData};
 
 #[tokio::main]
 async fn main() -> Result<(), MeteostatError> {
