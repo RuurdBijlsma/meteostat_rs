@@ -5,3 +5,4 @@
 * doc examples
 * waar is black box voor nodig in benches
 * check if documentation on #[builder] functions works (`find_stations`)
+* check cargo checklist (see exiftool)
