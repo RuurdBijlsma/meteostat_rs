@@ -42,7 +42,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
 fn plot_temperature(dataset: &DataFrame) {
     LinePlot::builder()
-        .data(&dataset)
+        .data(dataset)
         .x("date")
         .y("tavg")
         .additional_lines(vec!["tmin", "tmax"])
