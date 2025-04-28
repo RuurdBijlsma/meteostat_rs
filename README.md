@@ -27,9 +27,9 @@ Take a look at yesterday's temperatures or discover the weather hundreds of year
 * **Fetch by Location:** Get weather data for a location, specified by a latitude and longitude.
 * **Find Nearby Stations:** Search for stations near coordinates, optionally filtering by distance and required data
   availability (inventory).
-* **Multiple Frequencies:** Supports [**Hourly**](https://dev.meteostat.net/bulk/hourly.html#endpoints), [**Daily
-  **](https://dev.meteostat.net/bulk/daily.html), [**Monthly**](https://dev.meteostat.net/bulk/monthly.html), and [*
-  *Climate Normals**](https://dev.meteostat.net/bulk/normals.html) data.
+* **Multiple Frequencies:** Supports [**Hourly**](https://dev.meteostat.net/bulk/hourly.html#endpoints),
+[**Daily**](https://dev.meteostat.net/bulk/daily.html), [**Monthly**](https://dev.meteostat.net/bulk/monthly.html), and 
+[**Climate Normals**](https://dev.meteostat.net/bulk/normals.html) data.
 * **Efficient Data Handling:** Returns data as [Polars](https://pola.rs/) **`LazyFrame`s**, allowing for powerful,
   memory-efficient filtering and manipulation *before* collecting results.
 * **Convenient Filtering:** Includes a `MeteostatFrameFilterExt` trait for easy filtering of `LazyFrame`s by date, year,
@@ -231,4 +231,4 @@ on the [GitHub repository](https://github.com/RuurdBijlsma/meteostat_rs).
 ## License
 
 This crate is licensed under the Apache License 2.0. See
-the [LICENSE](https://github.com/RuurdBijlsma/meteostat_rs/blob/main/LICENSE) file for details.
+the [LICENSE](https://github.com/RuurdBijlsma/meteostat_rs/blob/main/LICENSE.md) file for details.
