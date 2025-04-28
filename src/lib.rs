@@ -117,4 +117,4 @@ pub use types::weather_condition::WeatherCondition;
 
 pub use error::MeteostatError;
 
-pub use filtering::MeteostatFrameFilterExt; // Expose the filtering trait
+pub use filtering::MeteostatFrameFilterExt;
