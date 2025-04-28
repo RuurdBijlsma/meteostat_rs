@@ -59,37 +59,18 @@ use std::str::FromStr; // For parsing DateTime<Utc>
 #[tokio::main]
 async fn main() -> Result<(), MeteostatError> {
     // Initialize the client (uses default cache directory)
-    let client = Meteostat::new().await?;
+    let client = Meteostat::new().await?;=
 
-    // --- Example 1: Get data for a known station ID ---
-    let schiphol_id = "06240"; // Amsterdam Schiphol Airport station ID
-    println!("Fetching daily data for station {}...", schiphol_id);
-    let daily_lazy = client
-        .from_station()
-        .station(schiphol_id)
-        .frequency(Frequency::Daily)
-        .call()
-        .await?;
-
-    // Filter the LazyFrame (e.g., for a specific year) before collecting
-    let daily_2023 = daily_lazy
-        .filter_daily_by_year(2023)? // Using MeteostatFrameFilterExt
-        .collect()?;
-
-    println!("Daily data for Schiphol (2023):\n{}", daily_2023.head(Some(5)));
-
-    // --- Example 2: Get data for a location ---
-    let berlin_center = LatLon(52.52, 13.40); // Berlin center coordinates
-    println!("\nFetching hourly data near Berlin ({}, {})...", berlin_center.0, berlin_center.1);
+    // --- Example: Get data for a location ---
+    let berlin_center = LatLon(52.52, 13.40);
     let hourly_lazy = client
         .from_location()
         .location(berlin_center)
         .frequency(Frequency::Hourly)
-        // Optionally refine search: .max_distance_km(25.0).station_limit(3)
         .call()
         .await?;
 
-    // Filter for a specific date using MeteostatFrameFilterExt
+    // Filter for a specific date
     let start_datetime = DateTime::<Utc>::from_str("2022-01-10T00:00:00Z").unwrap(); // Jan 10 2022 00:00:00 UTC
     let end_datetime = DateTime::<Utc>::from_str("2022-01-10T23:59:59Z").unwrap(); // Jan 10 2022 23:59:59 UTC
     let specific_day_hourly = hourly_lazy
@@ -97,28 +78,6 @@ async fn main() -> Result<(), MeteostatError> {
         .collect()?;
 
     println!("Hourly data near Berlin for 2022-01-10:\n{}", specific_day_hourly.head(Some(5)));
-
-    // --- Example 3: Find nearby stations ---
-    println!("\nFinding stations near Berlin...");
-    let nearby_stations = client
-        .find_stations()
-        .location(berlin_center)
-        .station_limit(3) // Find the closest 3 stations
-        // Optionally filter by inventory:
-        // .inventory_request(InventoryRequest::new(Frequency::Daily, RequiredData::Year(2023)))
-        .call()
-        .await?;
-
-    println!("Found {} stations near Berlin:", nearby_stations.len());
-    for station in nearby_stations {
-        println!(
-            "- ID: {}, Name: {:?}, Country: {}",
-            station.id,
-            station.name.get("en").unwrap_or(&"N/A".to_string()), // Safely get English name
-            station.country.as_deref().unwrap_or("N/A")
-        );
-    }
-
     Ok(())
 }
 ```
