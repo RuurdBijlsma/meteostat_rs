@@ -24,8 +24,9 @@
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), MeteostatError> {
-//!     // Initialize the client
-//!     use chrono::{DateTime, NaiveDateTime};
+//!     use std::str::FromStr;
+//! // Initialize the client
+//!     use chrono::{DateTime, NaiveDateTime, Utc};
 //! let client = Meteostat::new().await?;
 //!
 //!     // --- Example 1: Get data for a known station ID ---
@@ -39,10 +40,8 @@
 //!         .await?;
 //!
 //!     // Filter the LazyFrame (e.g., for a specific year) before collecting
-//!     let filter_start = NaiveDate::from_ymd_opt(2023, 1, 1).unwrap();
-//!     let filter_end = NaiveDate::from_ymd_opt(2023, 12, 31).unwrap();
 //!     let daily_2023 = daily_lazy
-//!         .filter_daily(filter_start, filter_end)
+//!         .filter_daily_by_year(2023)?
 //!         .collect()?;
 //!
 //!     println!("Daily data for Schiphol (2023):\n{}", daily_2023.head(Some(5)));
@@ -59,8 +58,8 @@
 //!         .await?;
 //!
 //!     // Filter for a specific date
-//!     let start_datetime = DateTime::from_timestamp(1641830400, 0).unwrap();// Jan 10 2022 17:00:00
-//!     let end_datetime = DateTime::from_timestamp(1641916800, 0).unwrap();// Jan 11 2022 17:00:00
+//!     let start_datetime = DateTime::<Utc>::from_str("2022-01-10T00:00:00Z").unwrap();// Jan 10 2022 00:00:00
+//!     let end_datetime = DateTime::<Utc>::from_str("2022-01-10T23:59:59Z").unwrap();// Jan 10 2022 23:59:59
 //!     let specific_day_hourly = hourly_lazy
 //!         .filter_hourly(start_datetime, end_datetime)
 //!         .collect()?;
@@ -118,4 +117,4 @@ pub use types::weather_condition::WeatherCondition;
 
 pub use error::MeteostatError;
 
-pub use filtering::MeteostatFrameFilterExt; // Expose the filtering trait
+pub use filtering::MeteostatFrameFilterExt;
