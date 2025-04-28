@@ -59,7 +59,7 @@ use std::str::FromStr; // For parsing DateTime<Utc>
 #[tokio::main]
 async fn main() -> Result<(), MeteostatError> {
     // Initialize the client (uses default cache directory)
-    let client = Meteostat::new().await?;=
+    let client = Meteostat::new().await?;
 
     // --- Example: Get data for a location ---
     let berlin_center = LatLon(52.52, 13.40);
@@ -101,11 +101,12 @@ This is particularly beneficial when dealing with potentially large historical d
 
 The crate automatically caches downloaded data to avoid redundant downloads and respect Meteostat's resources:
 
-* **Station Metadata:** The list of all stations (`stations/full.json.gz`) is downloaded once and cached.
+* **Station Metadata:** The list of all stations (`stations/lite.json.gz`) is downloaded once and cached.
 * **Weather Data:** Individual station data files (e.g., `hourly/10637.csv.gz`) are downloaded and cached per station
   and frequency.
 
-By default, cache files are stored in your system's standard cache directory (e.g., `~/.cache/meteostat_rs` on Linux).
+By default, cache files are stored in your system's standard cache directory (e.g., `~/.cache/meteostat_rs` on Linux,
+`%LOCALAPPDATA%/meteostat_rs_cache` on Windows).
 You can specify a custom cache location using `Meteostat::with_cache_folder(path)`.
 
 ## Filtering Data Frames
@@ -153,11 +154,6 @@ for all available filtering methods (`filter_daily`, `filter_monthly`, `filter_c
 
 * All weather data is sourced from **[Meteostat](https://meteostat.net/)**.
 * This crate uses Meteostat's **free bulk data interface**. No API key is required.
-* Data is provided in **CSV format** (compressed with Gzip) for weather records and **JSON** for station metadata.
-* **Important:** When using this crate (and thus Meteostat's data), you must comply with
-  their [Terms of Service](https://meteostat.net/en/terms). Please cache data appropriately and avoid overly aggressive
-  requests.
-* Consider supporting Meteostat via [donation](https://meteostat.net/en/donation) if their service is valuable to you.
 
 ## API Documentation
 
@@ -165,58 +161,61 @@ Full API documentation is available on [docs.rs](https://docs.rs/meteostat).
 
 ## Example: Plotting Data
 
-You can easily use the `DataFrame` output with plotting libraries like `plotters` (via the helper crate `plotlars`).
+You can easily use the `DataFrame` output with plotting libraries like `plotlars`.
 
 ```rust
 // Requires the 'examples' feature: cargo run --example graph_data --features examples
-use meteostat::{Frequency, LatLon, Meteostat, MeteostatFrameFilterExt, MeteostatError};
+use std::error::Error;
+
+use meteostat::{Frequency, LatLon, Meteostat, MeteostatFrameFilterExt};
+use plotlars::{Line, LinePlot, Plot, Rgb, Text};
 use polars::prelude::*;
-# #[cfg(feature = "examples")] // Only include plotlars if feature enabled
-# use plotlars::{Axis, Line, LinePlot, Plot, Rgb, Text};
-# use std::error::Error;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let meteostat = Meteostat::new().await?;
-    let location = LatLon(52.118641, 5.185589); // De Bilt, Netherlands
+  let meteostat = Meteostat::new().await?;
+  let location = LatLon(52.118641, 5.185589); // De Bilt, Netherlands
 
-    let weather_data: DataFrame = meteostat
-        .from_location()
-        .location(location)
-        .frequency(Frequency::Daily)
-        .call()
-        .await?
-        .filter_daily_by_year(2023)?
-        .collect()?;
+  let weather_data: DataFrame = meteostat
+          .from_location()
+          .location(location)
+          .frequency(Frequency::Daily)
+          .call()
+          .await?
+          .filter_daily_by_year(2023)?
+          .collect()?;
 
-    println!("Daily Data for De Bilt (2023):\n{}", weather_data.head(Some(5)));
+  println!(
+    "Daily Data for De Bilt (2023):\n{}",
+    weather_data.head(Some(5))
+  );
 
-    // Plotting logic using plotlars (requires 'examples' feature)
-    # #[cfg(feature = "examples")]
-    plot_temperature(&weather_data)?;
+  plot_temperature(&weather_data);
 
-    Ok(())
+  Ok(())
 }
 
-# #[cfg(feature = "examples")] // Only include if feature enabled
-# fn plot_temperature(dataset: &DataFrame) -> Result<(), Box<dyn Error>> {
-    # LinePlot::builder()
-    # .data(&dataset)
-    # .x("date")
-    # .y("tavg") // Average temperature
-    # .additional_lines(vec!["tmin", "tmax"]) // Min and Max temps
-    # .colors(vec![Rgb(120, 120, 120), Rgb(69, 143, 196), Rgb(199, 115, 42)])
-    # .lines(vec![Line::Solid, Line::Dot, Line::Dot])
-    # .width(3.0)
-    # .plot_title(Text::from("Temperature at De Bilt (2023)").font("Arial").size(18))
-    # .x_axis(&Axis::new().tick_labels(vec!["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"])) // Simplified axis for readme
-    # .build()
-    # .view(); // Opens plot in browser
-    # Ok(())
-    #
+fn plot_temperature(dataset: &DataFrame) {
+  LinePlot::builder()
+    .data(&dataset)
+    .x("date")
+    .y("tavg") // Average temperature
+    .additional_lines(vec!["tmin", "tmax"]) // Min and Max temps
+    .colors(vec![
+      Rgb(120, 120, 120),
+      Rgb(69, 143, 196),
+      Rgb(199, 115, 42),
+    ])
+    .lines(vec![Line::Solid, Line::Dot, Line::Dot])
+    .width(3.0)
+    .plot_title(
+      Text::from("Temperature at De Bilt (2023)")
+        .font("Arial")
+        .size(18),
+    )
+    .build()
+    .plot();
 }
-# #[cfg(not(feature = "examples"))] // Dummy function if feature not enabled
-# fn plot_temperature(_dataset: &DataFrame) -> Result<(), Box<dyn Error>> { Ok(()) }
 ```
 
 To run this specific example, enable the `examples` feature:
