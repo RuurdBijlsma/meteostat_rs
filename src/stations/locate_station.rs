@@ -1,5 +1,5 @@
 use crate::stations::error::LocateStationError;
-use crate::types::data_source::{Frequency, RequiredData};
+use crate::types::frequency::{Frequency, RequiredData};
 use crate::types::station::YearRange;
 use crate::types::station::{DateRange, Station};
 use async_compression::tokio::bufread::GzipDecoder;
@@ -411,7 +411,7 @@ impl StationLocator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::data_source::{Frequency, RequiredData};
+    use crate::types::frequency::{Frequency, RequiredData};
     use crate::types::station::Station;
     // Make sure get_cache_dir is available or replace with hardcoded path for tests
     use crate::utils::get_cache_dir;

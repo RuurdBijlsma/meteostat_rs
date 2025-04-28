@@ -1,7 +1,8 @@
 use crate::stations::error::LocateStationError;
-use crate::types::data_source::Frequency;
+use crate::types::frequency::Frequency;
 use crate::weather_data::error::WeatherDataError;
 use std::path::PathBuf;
+use polars::frame::DataFrame;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -40,4 +41,13 @@ pub enum MeteostatError {
         stations_tried: usize,
         last_error: Option<Box<MeteostatError>>,
     },
+    
+    #[error("Could not detect frequency variant from dataframe.\n{0}")]
+    FrequencyDetectionError(DataFrame),
+    
+    #[error("Could not interpret parameter as date(time).")]
+    DateParsingError,
+    
+    #[error("Cannot get single climate row from just one date.")]
+    ClimateSingleDateError,
 }

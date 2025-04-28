@@ -1,4 +1,4 @@
-use crate::types::data_source::Frequency;
+use crate::types::frequency::Frequency;
 use chrono::NaiveDate;
 use polars::error::PolarsError;
 use std::path::PathBuf;

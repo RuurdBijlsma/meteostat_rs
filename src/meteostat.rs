@@ -3,14 +3,19 @@
 //! geographical coordinates (latitude/longitude).
 
 use crate::error::MeteostatError;
+use crate::meteostat_frame::MeteostatFrame;
 use crate::stations::locate_station::StationLocator;
-use crate::types::data_source::{Frequency, RequiredData};
+use crate::types::frequency::{Frequency, RequiredData};
 use crate::types::station::Station;
 use crate::utils::{ensure_cache_dir_exists, get_cache_dir};
 use crate::weather_data::frame_fetcher::FrameFetcher;
 use bon::bon;
 use polars::prelude::LazyFrame;
 use std::path::PathBuf;
+use crate::types::frequencies::climate_frame::ClimateFrame;
+use crate::types::frequencies::daily_frame::DailyFrame;
+use crate::types::frequencies::hourly_frame::HourlyFrame;
+use crate::types::frequencies::monthly_frame::MonthlyFrame;
 
 /// Represents a geographical coordinate using latitude and longitude.
 ///
@@ -352,11 +357,13 @@ impl Meteostat {
         &self,
         station: &str,
         frequency: Frequency,
-    ) -> Result<LazyFrame, MeteostatError> {
-        self.fetcher
+    ) -> Result<MeteostatFrame, MeteostatError> {
+        let frame = self
+            .fetcher
             .get_cache_lazyframe(station, frequency)
             .await
-            .map_err(MeteostatError::from) // Convert WeatherDataError to MeteostatError
+            .map_err(MeteostatError::from)?;
+        Ok(MeteostatFrame { frame, frequency })
     }
 
     /// Fetches weather data for the closest available station near a geographical location.
@@ -441,7 +448,7 @@ impl Meteostat {
         max_distance_km: Option<f64>,
         station_limit: Option<usize>,
         required_data: Option<RequiredData>,
-    ) -> Result<LazyFrame, MeteostatError> {
+    ) -> Result<MeteostatFrame, MeteostatError> {
         // Note: Defaults applied here if builder methods not called.
         let max_distance_km = max_distance_km.unwrap_or(50.0);
         // Default limit for *candidate stations to try* in from_location is 1.
@@ -477,7 +484,12 @@ impl Meteostat {
             {
                 Ok(lazy_frame) => {
                     // Successfully fetched data, return it immediately
-                    return Ok(lazy_frame);
+                    match frequency {
+                        Frequency::Hourly=>HourlyFrame::new(lazy_frame),
+                        Frequency::Daily=>DailyFrame::new(lazy_frame),
+                        Frequency::Monthly=>MonthlyFrame::new(lazy_frame),
+                        Frequency::Climate=>ClimateFrame::new(lazy_frame),
+                    }
                 }
                 Err(e) => {
                     // Convert specific WeatherDataError to the general MeteostatError
@@ -502,7 +514,7 @@ impl Meteostat {
 mod tests {
     use crate::error::MeteostatError;
     use crate::meteostat::{InventoryRequest, LatLon, Meteostat};
-    use crate::types::data_source::{Frequency, RequiredData};
+    use crate::types::frequency::{Frequency, RequiredData};
 
     #[tokio::test]
     async fn test_get_hourly() -> Result<(), MeteostatError> {
@@ -513,7 +525,8 @@ mod tests {
             .station("10637")
             .frequency(Frequency::Hourly)
             .call()
-            .await?;
+            .await?
+            .frame;
 
         let hourly_frame = data.collect()?;
 
@@ -544,7 +557,8 @@ mod tests {
             .station("10637")
             .frequency(Frequency::Daily)
             .call()
-            .await?;
+            .await?
+            .frame;
 
         let daily_frame = data.collect()?;
 
@@ -574,7 +588,8 @@ mod tests {
             .station("10637")
             .frequency(Frequency::Monthly)
             .call()
-            .await?;
+            .await?
+            .frame;
 
         let monthly_frame = data.collect()?;
         dbg!(&monthly_frame);
@@ -591,7 +606,8 @@ mod tests {
             .station("10637")
             .frequency(Frequency::Climate)
             .call()
-            .await?;
+            .await?
+            .frame;
 
         let climate_frame = data.collect()?;
         dbg!(&climate_frame);
@@ -608,7 +624,8 @@ mod tests {
             .location(LatLon(52.520008, 13.404954))
             .frequency(Frequency::Hourly)
             .call()
-            .await?;
+            .await?
+            .frame;
 
         let frame = hourly_data.collect()?;
 

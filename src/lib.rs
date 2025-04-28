@@ -101,7 +101,6 @@
 //! Check the specific function/method documentation for details on arguments, return types, and potential errors.
 
 mod error;
-mod filtering;
 mod meteostat;
 mod stations;
 mod types;
@@ -110,11 +109,7 @@ mod weather_data;
 
 pub use meteostat::*;
 
-pub use types::data_source::{Frequency, RequiredData};
-pub use types::into_utc_trait::IntoUtcDateTime;
+pub use error::MeteostatError;
+pub use types::frequency::{Frequency, RequiredData};
 pub use types::station::Station;
 pub use types::weather_condition::WeatherCondition;
-
-pub use error::MeteostatError;
-
-pub use filtering::MeteostatFrameFilterExt;

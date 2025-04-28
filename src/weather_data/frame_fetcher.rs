@@ -1,4 +1,4 @@
-use crate::types::data_source::Frequency;
+use crate::types::frequency::Frequency;
 use crate::weather_data::data_loader::WeatherDataLoader;
 use crate::weather_data::error::WeatherDataError;
 use polars::prelude::LazyFrame;

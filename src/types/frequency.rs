@@ -1,7 +1,10 @@
 //! Defines types related to the frequency of Meteostat data and requirements
 //! for checking station data availability (inventory).
 
+use crate::MeteostatError;
 use chrono::NaiveDate;
+use polars::frame::DataFrame;
+use polars::prelude::LazyFrame;
 use std::fmt;
 
 /// Represents the time frequency or granularity of Meteostat weather data.
@@ -48,8 +51,8 @@ impl Frequency {
                 "year", "month", "tavg", "tmin", "tmax", "prcp", "wspd", "pres", "tsun",
             ],
             Frequency::Climate => vec![
-                "start_year", // Note: Corresponds to 'start' in Meteostat JSON
-                "end_year",   // Note: Corresponds to 'end' in Meteostat JSON
+                "start_year",
+                "end_year",
                 "month",
                 "tmin",
                 "tmax",
