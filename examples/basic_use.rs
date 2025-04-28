@@ -1,9 +1,7 @@
 use chrono::{DateTime, Utc};
 use meteostat::{Frequency, LatLon, Meteostat, MeteostatError, MeteostatFrameFilterExt};
-use polars::prelude::*;
 use std::env;
 use std::str::FromStr;
-// For parsing DateTime<Utc>
 
 #[tokio::main]
 async fn main() -> Result<(), MeteostatError> {
