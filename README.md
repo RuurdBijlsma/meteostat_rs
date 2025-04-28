@@ -8,13 +8,7 @@
 
 **The Weather's Record Keeper - In Rust!**
 
-<a href="https://github.com/RuurdBijlsma/meteostat_rs/blob/main/examples/graph_data.rs" title="Example: Plotting Temperature Data">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/RuurdBijlsma/meteostat_rs/main/.github/screenshots/temp_plot.png">
-    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/RuurdBijlsma/meteostat_rs/main/.github/screenshots/temp_plot.png">
-    <img alt="Example Plot showing Daily Temperature Averages, Min, and Max for De Bilt (2023)" src="https://raw.githubusercontent.com/RuurdBijlsma/meteostat_rs/main/.github/screenshots/temp_plot.png" width="75%">
-  </picture>
-</a>
+![Example Plot showing Daily Temperature Averages, Min, and Max for De Bilt (2023).](https://raw.githubusercontent.com/RuurdBijlsma/meteostat_rs/main/.github/screenshots/temp_plot.png)
 
 This crate provides a convenient asynchronous Rust interface for accessing historical weather and climate data
 from [Meteostat](https://meteostat.net/), leveraging their publicly available **bulk data interface**. It allows
@@ -22,18 +16,20 @@ fetching data for thousands of weather stations worldwide.
 
 > **Meteostat is a free and open provider of weather & climate data.** They do the hard work of collecting, processing,
 > and providing the data. This crate is simply a Rust client for their bulk API. Please consider supporting Meteostat if
-> you find their data useful: [**Donate to Meteostat**](https://meteostat.net/en/donation).
+> you find their data useful: [**Donate to Meteostat**](https://meteostat.net/en/patrons).
 
 Take a look at yesterday's temperatures or discover the weather hundreds of years ago, right from your Rust application.
 
 ## Key Features
 
 * **Fetch by Station ID:** Get weather data for a
-  specific [Meteostat station ID](https://meteostat.net/en/station/search).
-* **Fetch by Location:** Find the closest weather station to a given latitude/longitude and retrieve its data.
+  specific Meteostat station ID.
+* **Fetch by Location:** Get weather data for a location, specified by a latitude and longitude.
 * **Find Nearby Stations:** Search for stations near coordinates, optionally filtering by distance and required data
   availability (inventory).
-* **Multiple Frequencies:** Supports **Hourly**, **Daily**, **Monthly**, and **Climate Normals** data.
+* **Multiple Frequencies:** Supports [**Hourly**](https://dev.meteostat.net/bulk/hourly.html#endpoints), [**Daily
+  **](https://dev.meteostat.net/bulk/daily.html), [**Monthly**](https://dev.meteostat.net/bulk/monthly.html), and [*
+  *Climate Normals**](https://dev.meteostat.net/bulk/normals.html) data.
 * **Efficient Data Handling:** Returns data as [Polars](https://pola.rs/) **`LazyFrame`s**, allowing for powerful,
   memory-efficient filtering and manipulation *before* collecting results.
 * **Convenient Filtering:** Includes a `MeteostatFrameFilterExt` trait for easy filtering of `LazyFrame`s by date, year,
@@ -48,13 +44,6 @@ Add `meteostat` to your `Cargo.toml` dependencies:
 
 ```bash
 cargo add meteostat
-```
-
-Or add it manually:
-
-```toml
-[dependencies]
-meteostat = "0.1.0" # Use the latest version
 ```
 
 ## Basic Usage
