@@ -27,10 +27,10 @@ pub use types::traits::period::month_period::MonthPeriod;
 pub use types::traits::types::Month;
 pub use types::traits::types::Year;
 
-pub use types::frequencies::climate_frame::*;
-pub use types::frequencies::daily_frame::*;
-pub use types::frequencies::hourly_frame::*;
-pub use types::frequencies::monthly_frame::*;
+pub use types::frequency_frames::climate_frame::*;
+pub use types::frequency_frames::daily_frame::*;
+pub use types::frequency_frames::hourly_frame::*;
+pub use types::frequency_frames::monthly_frame::*;
 
 pub use stations::error::LocateStationError;
 pub use weather_data::error::WeatherDataError;

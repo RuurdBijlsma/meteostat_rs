@@ -1,10 +1,18 @@
 use chrono::{DateTime, NaiveDate, Utc};
+use std::fmt;
+use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Ord, PartialOrd, Hash)]
 pub struct Year(pub i32);
 impl Year {
     pub fn get(self) -> i32 {
         self.0
+    }
+}
+
+impl Display for Year {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{:04}", self.0)
     }
 }
 
@@ -19,6 +27,12 @@ impl Month {
     }
     pub fn new(month: u32, year: i32) -> Self {
         Self(year, month)
+    }
+}
+
+impl Display for Month {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{:04}-{:02}", self.0, self.1)
     }
 }
 

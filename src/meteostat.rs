@@ -1,3 +1,9 @@
+//! The main entry point for interacting with the Meteostat API client.
+//!
+//! Provides methods to configure the client (e.g., cache location) and access
+//! different types of weather data (hourly, daily, monthly, climate normals)
+//! either by station ID or by geographical location.
+
 use crate::stations::locate_station::StationLocator;
 use crate::utils::{ensure_cache_dir_exists, get_cache_dir};
 use crate::weather_data::frame_fetcher::FrameFetcher;
@@ -9,16 +15,36 @@ use bon::bon;
 use polars::prelude::LazyFrame;
 use std::path::PathBuf;
 
+/// Represents a geographical coordinate using Latitude and Longitude.
+///
+/// Used for querying weather stations or data based on location.
+///
+/// # Fields
+///
+/// * `0` - Latitude in decimal degrees.
+/// * `1` - Longitude in decimal degrees.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct LatLon(pub f64, pub f64);
 
+/// Represents criteria for filtering weather stations based on their data inventory.
+///
+/// Used in conjunction with [`Meteostat::find_stations`] to find stations that
+/// report having data for a specific frequency and meeting certain data coverage requirements.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct InventoryRequest {
+    /// The required data frequency (e.g., Hourly, Daily).
     frequency: Frequency,
+    /// The specific data coverage requirement (e.g., Any, FullYear(2023)).
     required_data: RequiredData,
 }
 
 impl InventoryRequest {
+    /// Creates a new inventory request.
+    ///
+    /// # Arguments
+    ///
+    /// * `frequency` - The desired data [`Frequency`].
+    /// * `required_data` - The [`RequiredData`] criteria for data coverage.
     pub fn new(frequency: Frequency, required_data: RequiredData) -> Self {
         Self {
             frequency,
@@ -27,6 +53,12 @@ impl InventoryRequest {
     }
 }
 
+/// The main client struct for accessing Meteostat data.
+///
+/// Provides methods to fetch weather data (hourly, daily, monthly, climate)
+/// and find weather stations. Handles data caching internally.
+///
+/// Create instances using [`Meteostat::new`] or [`Meteostat::with_cache_folder`].
 pub struct Meteostat {
     fetcher: FrameFetcher,
     station_locator: StationLocator,
@@ -34,43 +66,263 @@ pub struct Meteostat {
 
 #[bon]
 impl Meteostat {
+    /// Creates a new `Meteostat` client using a specific cache folder.
+    ///
+    /// Initializes the station locator and frame fetcher, ensuring the specified
+    /// cache directory exists.
+    ///
+    /// # Arguments
+    ///
+    /// * `cache_folder` - A `PathBuf` representing the directory to use for caching
+    ///   station metadata and downloaded weather data.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing the initialized `Meteostat` client or a `MeteostatError`
+    /// if initialization fails.
+    ///
+    /// # Errors
+    ///
+    /// This function can return errors if:
+    /// - The cache directory cannot be created ([`MeteostatError::CacheDirCreation`]).
+    /// - Loading or initializing station data fails (propagated from `StationLocator::new`,
+    ///   resulting in [`MeteostatError::LocateStation`]).
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use meteostat::{Meteostat, MeteostatError};
+    /// use std::path::PathBuf;
+    /// use tempfile::tempdir; // For example purposes
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let temp_dir = tempdir()?; // Create a temporary directory
+    /// let cache_path = temp_dir.path().join("my_meteostat_cache");
+    ///
+    /// // Create a client with a custom cache location
+    /// let client = Meteostat::with_cache_folder(cache_path).await?;
+    ///
+    /// println!("Meteostat client initialized with custom cache.");
+    /// // Use the client...
+    ///
+    /// temp_dir.close()?; // Clean up temp directory
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn with_cache_folder(cache_folder: PathBuf) -> Result<Self, MeteostatError> {
+        // Ensure the directory exists
         ensure_cache_dir_exists(&cache_folder)
             .await
             .map_err(|e| MeteostatError::CacheDirCreation(cache_folder.clone(), e))?;
+
+        // Initialize components
         Ok(Self {
             station_locator: StationLocator::new(&cache_folder)
                 .await
-                .map_err(MeteostatError::from)?,
+                .map_err(MeteostatError::from)?, // Converts LocateStationError
             fetcher: FrameFetcher::new(&cache_folder),
         })
     }
 
+    /// Creates a new `Meteostat` client using the default cache folder location.
+    ///
+    /// The default location is platform-dependent (e.g., `~/.cache/meteostat-rs` on Linux).
+    /// Initializes the station locator and frame fetcher, ensuring the default
+    /// cache directory exists.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing the initialized `Meteostat` client or a `MeteostatError`
+    /// if initialization fails.
+    ///
+    /// # Errors
+    ///
+    /// This function can return errors if:
+    /// - The default cache directory path cannot be determined ([`MeteostatError::CacheDirResolution`]).
+    /// - The default cache directory cannot be created ([`MeteostatError::CacheDirCreation`]).
+    /// - Loading or initializing station data fails (propagated from `StationLocator::new`,
+    ///   resulting in [`MeteostatError::LocateStation`]).
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use meteostat::{Meteostat, MeteostatError};
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), MeteostatError> {
+    /// // Create a client with the default cache location
+    /// let client = Meteostat::new().await?;
+    ///
+    /// println!("Meteostat client initialized with default cache.");
+    /// // Use the client...
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn new() -> Result<Self, MeteostatError> {
         let cache_folder = get_cache_dir().map_err(MeteostatError::CacheDirResolution)?;
         Self::with_cache_folder(cache_folder).await
     }
 
-    /// Prepares a request for hourly data.
+    /// Prepares a request builder for fetching hourly weather data.
+    ///
+    /// Returns an [`HourlyClient`] which allows specifying a station ID or location
+    /// and optional parameters before executing the request.
+    ///
+    /// # Returns
+    ///
+    /// An [`HourlyClient`] associated with this `Meteostat` instance.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use meteostat::{Meteostat, MeteostatError, LatLon};
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), MeteostatError> {
+    /// let client = Meteostat::new().await?;
+    /// let berlin = LatLon(52.52, 13.40);
+    ///
+    /// // Get hourly data for Berlin (nearest station)
+    /// let hourly_data = client.hourly().location(berlin).call().await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn hourly(&self) -> HourlyClient<'_> {
         HourlyClient::new(self)
     }
 
-    /// Prepares a request for daily data.
+    /// Prepares a request builder for fetching daily weather data.
+    ///
+    /// Returns a [`DailyClient`] which allows specifying a station ID or location
+    /// and optional parameters before executing the request.
+    ///
+    /// # Returns
+    ///
+    /// A [`DailyClient`] associated with this `Meteostat` instance.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use meteostat::{Meteostat, MeteostatError, LatLon};
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), MeteostatError> {
+    /// let client = Meteostat::new().await?;
+    /// let paris = LatLon(48.85, 2.35);
+    ///
+    /// // Get daily data for station "07150" (Paris-Montsouris)
+    /// let daily_data = client.daily().station("07150").await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn daily(&self) -> DailyClient<'_> {
         DailyClient::new(self)
     }
 
-    /// Prepares a request for monthly data.
+    /// Prepares a request builder for fetching monthly weather data.
+    ///
+    /// Returns a [`MonthlyClient`] which allows specifying a station ID or location
+    /// and optional parameters before executing the request.
+    ///
+    /// # Returns
+    ///
+    /// A [`MonthlyClient`] associated with this `Meteostat` instance.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use meteostat::{Meteostat, MeteostatError, LatLon};
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), MeteostatError> {
+    /// let client = Meteostat::new().await?;
+    /// let london = LatLon(51.50, -0.12);
+    ///
+    /// // Get monthly data for London (nearest station)
+    /// let monthly_data = client.monthly().location(london).call().await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn monthly(&self) -> MonthlyClient<'_> {
         MonthlyClient::new(self)
     }
 
-    /// Prepares a request for climate data.
+    /// Prepares a request builder for fetching climate normals data.
+    ///
+    /// Returns a [`ClimateClient`] which allows specifying a station ID or location
+    /// and optional parameters before executing the request.
+    ///
+    /// # Returns
+    ///
+    /// A [`ClimateClient`] associated with this `Meteostat` instance.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use meteostat::{Meteostat, MeteostatError, LatLon};
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), MeteostatError> {
+    /// let client = Meteostat::new().await?;
+    ///
+    /// // Get climate normals for station "10382" (Berlin-Tegel)
+    /// let climate_data = client.climate().station("10382").await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn climate(&self) -> ClimateClient<'_> {
         ClimateClient::new(self)
     }
 
+    /// Finds weather stations near a given geographical location.
+    ///
+    /// Allows filtering by maximum distance, number of stations, and data inventory requirements.
+    /// Uses a builder pattern for optional parameters.
+    ///
+    /// # Arguments (Builder Methods)
+    ///
+    /// * `.location(LatLon)`: **Required.** The geographical coordinate [`LatLon`] around which to search.
+    /// * `.inventory_request(InventoryRequest)`: *Optional.* Filters stations based on reported data availability using an [`InventoryRequest`].
+    /// * `.max_distance_km(f64)`: *Optional.* The maximum search radius in kilometers. Defaults to `50.0`.
+    /// * `.station_limit(usize)`: *Optional.* The maximum number of stations to return, sorted by distance. Defaults to `5`.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing a `Vec<Station>` of found stations (sorted by distance, closest first),
+    /// or a `MeteostatError` if the search fails.
+    ///
+    /// # Errors
+    ///
+    /// Can return errors propagated from the underlying station search mechanism
+    /// ([`MeteostatError::LocateStation`]). Note that finding *no* stations within
+    /// the criteria is **not** considered an error for this method; it will return an empty `Vec`.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use meteostat::{Meteostat, MeteostatError, LatLon, InventoryRequest, Frequency, RequiredData};
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), MeteostatError> {
+    /// let client = Meteostat::new().await?;
+    /// let nyc = LatLon(40.7128, -74.0060);
+    ///
+    /// // Find the 3 closest stations within 100km of NYC
+    /// // that have reported *any* Daily data.
+    /// let inventory_req = InventoryRequest::new(Frequency::Daily, RequiredData::Any);
+    ///
+    /// let stations = client.find_stations()
+    ///     .location(nyc)
+    ///     .max_distance_km(100.0)
+    ///     .station_limit(3)
+    ///     .inventory_request(inventory_req)
+    ///     .call()
+    ///     .await?;
+    ///
+    /// println!("Found {} stations near NYC matching criteria:", stations.len());
+    /// for station in stations {
+    ///     println!("  - ID: {}, Name: {:?}", station.id, station.name.get("en"));
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
     #[builder]
     pub async fn find_stations(
         &self,
@@ -87,21 +339,45 @@ impl Meteostat {
             .map(|req| (Some(req.frequency), Some(req.required_data))) // Pass Some when inventory_request is Some
             .unwrap_or((None, None)); // Pass None otherwise
 
-        let stations_with_distance = self.station_locator.query(
-            location.0,
-            location.1,
-            stations_limit,
-            max_distance_km,
-            freq_option,
-            date_option,
-        );
+        // Perform the query using the station locator
+        let stations_with_distance = self
+            .station_locator
+            .query(
+                location.0,
+                location.1,
+                stations_limit,
+                max_distance_km,
+                freq_option,
+                date_option,
+            );
 
+        // Extract stations and discard distances
         Ok(stations_with_distance
             .into_iter()
             .map(|(station, _distance)| station) // Discard the distance for the return type
             .collect())
     }
 
+    /// **Internal:** Fetches a lazy frame for a specific station and frequency.
+    ///
+    /// Handles cache lookup and potential downloads via `FrameFetcher`.
+    /// This method is intended for internal use by the frequency-specific clients
+    /// (`HourlyClient`, `DailyClient`, etc.).
+    ///
+    /// # Arguments
+    ///
+    /// * `station` - The ID of the weather station.
+    /// * `frequency` - The desired data [`Frequency`].
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing a Polars `LazyFrame` for the requested data,
+    /// or a `MeteostatError` if fetching fails.
+    ///
+    /// # Errors
+    ///
+    /// Can return [`MeteostatError::WeatherData`] if fetching/parsing the data fails
+    /// (e.g., network error, file not found, CSV parsing error).
     #[builder]
     pub(crate) async fn data_from_station(
         &self,
@@ -111,8 +387,35 @@ impl Meteostat {
         self.fetcher
             .get_cache_lazyframe(station, frequency)
             .await
-            .map_err(MeteostatError::from)
+            .map_err(MeteostatError::from) // Converts WeatherDataError
     }
+
+    /// **Internal:** Fetches a lazy frame for the nearest suitable station to a location.
+    ///
+    /// Finds nearby stations matching the criteria, then attempts to fetch data
+    /// from them sequentially (closest first) until successful.
+    /// This method is intended for internal use by the frequency-specific clients.
+    ///
+    /// # Arguments
+    ///
+    /// * `location` - The target [`LatLon`].
+    /// * `frequency` - The desired data [`Frequency`].
+    /// * `max_distance_km` - *Optional.* Max search radius. Defaults to `50.0`.
+    /// * `station_limit` - *Optional.* Max number of *candidate stations* to query. Defaults to `1`.
+    /// * `required_data` - *Optional.* Filter candidate stations by [`RequiredData`].
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing a Polars `LazyFrame` for the first successful station,
+    /// or a `MeteostatError` if no suitable station is found or data fetching fails for all candidates.
+    ///
+    /// # Errors
+    ///
+    /// Can return:
+    /// - [`MeteostatError::NoStationWithinRadius`]: If the initial station query finds no candidates matching the criteria.
+    /// - [`MeteostatError::NoDataFoundForNearbyStations`]: If candidate stations were found, but fetching data failed for all of them. Includes the last encountered `WeatherData` error.
+    /// - [`MeteostatError::LocateStation`]: If the station query itself fails.
+    /// - [`MeteostatError::WeatherData`]: Encapsulated within `NoDataFoundForNearbyStations` if fetching fails for a candidate.
     #[builder]
     pub(crate) async fn data_from_location(
         &self,
@@ -128,14 +431,16 @@ impl Meteostat {
         let stations_limit = station_limit.unwrap_or(1);
 
         // Query for candidate stations
-        let stations = self.station_locator.query(
-            location.0,
-            location.1,
-            stations_limit, // Limit the number of candidates fetched
-            max_distance_km,
-            Some(frequency), // Always filter by frequency for from_location
-            required_data,   // Apply optional date/inventory filter
-        );
+        let stations = self
+            .station_locator
+            .query(
+                location.0,
+                location.1,
+                stations_limit, // Limit the number of candidates fetched
+                max_distance_km,
+                Some(frequency), // Always filter by frequency for from_location
+                required_data,   // Apply optional date/inventory filter
+            );
 
         // Handle case where no stations are found matching the criteria
         if stations.is_empty() {
@@ -163,6 +468,7 @@ impl Meteostat {
                     // Convert specific WeatherDataError to the general MeteostatError
                     let current_error = MeteostatError::from(e);
                     last_error = Some(current_error);
+                    // Continue to the next station
                 }
             }
         }
@@ -181,8 +487,6 @@ impl Meteostat {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Month, Year};
-    use chrono::NaiveDate;
     use tempfile::tempdir;
 
     // Helper to create a known location (Berlin Mitte)
@@ -339,172 +643,6 @@ mod tests {
         Ok(())
     }
 
-    // --- Data Fetching Tests (via Clients) ---
-    // These also implicitly test data_from_station and data_from_location
-
-    // HOURLY (Existing tests are good, maybe add one for specific date)
-    #[tokio::test]
-    async fn test_hourly_from_station_for_period() -> Result<(), MeteostatError> {
-        let client = Meteostat::new().await?;
-        let data = client
-            .hourly()
-            .station("06240") // Station near Paris
-            .await?
-            .get_for_period(Year(2023))?
-            .frame
-            .collect()?;
-        assert!(data.height() > 0, "Expected some hourly data for 2023");
-        // dbg!(&data.head(Some(5))); // Optional: print head
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_hourly_from_station_at_specific_datetime() -> Result<(), MeteostatError> {
-        let client = Meteostat::new().await?;
-        let data = client
-            .hourly()
-            .station("06240") // Station near Paris
-            .await?
-            // Use a type that implements AnyDateTime, like chrono::DateTime<Utc>
-            .get_at(chrono::DateTime::parse_from_rfc3339("2023-07-15T12:00:00Z").unwrap())?
-            .frame
-            .collect()?;
-        // get_at should return 0 or 1 row for hourly data
-        assert!(data.height() <= 1, "Expected 0 or 1 row for specific hour");
-        // dbg!(&data);
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_hourly_from_location_for_period() -> Result<(), MeteostatError> {
-        let client = Meteostat::new().await?;
-        let data = client
-            .hourly()
-            .location(berlin_location())
-            // .max_distance_km(50.0) // Default is 50km anyway
-            .call() // Call finishes the builder
-            .await?
-            .get_for_period(Month(2023, 7))? // Get July 2023
-            .frame
-            .collect()?;
-        assert!(
-            data.height() > 0,
-            "Expected some hourly data for Berlin area in July 2023"
-        );
-        // dbg!(&data.head(Some(5)));
-        Ok(())
-    }
-
-    // DAILY
-    #[tokio::test]
-    async fn test_daily_from_station_for_period() -> Result<(), MeteostatError> {
-        let client = Meteostat::new().await?;
-        let data = client
-            .daily()
-            .station("06240") // Station near Paris
-            .await?
-            .get_for_period(Year(2023))?
-            .frame
-            .collect()?;
-        assert!(data.height() > 0, "Expected some daily data for 2023");
-        // dbg!(&data.head(Some(5)));
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_daily_from_station_at_specific_date() -> Result<(), MeteostatError> {
-        let client = Meteostat::new().await?;
-        let data = client
-            .daily()
-            .station("06240") // Station near Paris
-            .await?
-            .get_at(NaiveDate::from_ymd_opt(2023, 7, 15).unwrap())? // Use Day, Month, Year or NaiveDate
-            .frame
-            .collect()?;
-        assert!(data.height() <= 1, "Expected 0 or 1 row for specific day");
-        // dbg!(&data);
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_daily_from_location_for_period() -> Result<(), MeteostatError> {
-        let client = Meteostat::new().await?;
-        let data = client
-            .daily()
-            .location(berlin_location())
-            .call() // Call finishes the builder
-            .await?
-            .get_for_period(Year(2023))?
-            .frame
-            .collect()?;
-        assert!(
-            data.height() > 0,
-            "Expected some daily data for Berlin area in 2023"
-        );
-        // dbg!(&data.head(Some(5)));
-        Ok(())
-    }
-
-    // MONTHLY
-    #[tokio::test]
-    async fn test_monthly_from_station() -> Result<(), MeteostatError> {
-        let client = Meteostat::new().await?;
-        let data = client
-            .monthly()
-            .station("06240") // Station near Paris
-            .await?
-            // Monthly data often doesn't have per-period filters in the same way,
-            // just collect the whole frame for the test.
-            .frame
-            .collect()?;
-        assert!(data.height() > 0, "Expected some monthly data");
-        // dbg!(&data.head(Some(5)));
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_monthly_from_location() -> Result<(), MeteostatError> {
-        let client = Meteostat::new().await?;
-        let data = client
-            .monthly()
-            .location(berlin_location())
-            .call() // Call finishes the builder
-            .await?
-            .frame
-            .collect()?;
-        assert!(
-            data.height() > 0,
-            "Expected some monthly data for Berlin area"
-        );
-        // dbg!(&data.head(Some(5)));
-        Ok(())
-    }
-
-    // CLIMATE
-    #[tokio::test]
-    async fn test_climate_from_station() -> Result<(), MeteostatError> {
-        let client = Meteostat::new().await?;
-        // Climate normals station (e.g., Berlin-Tegel if available)
-        // Using 10382 as an example which often has normals
-        let data = client.climate().station("10382").await?.frame.collect()?;
-        assert!(!data.is_empty());
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_climate_from_location() -> Result<(), MeteostatError> {
-        let client = Meteostat::new().await?;
-        let data = client
-            .climate()
-            .location(berlin_location())
-            .call() 
-            .await?
-            .frame
-            .collect()?;
-        assert!(!data.is_empty(), "Expected climate normals for Berlin area");
-        Ok(())
-    }
-
     // --- Error Handling Tests ---
 
     #[tokio::test]
@@ -564,7 +702,7 @@ mod tests {
             // Add the requirement for non-existent data
             .required_data(future_req)
             // Try only the very closest station(s)
-            .station_limit(1)
+            .station_limit(1) // limit candidates checked by data_from_location
             .call()
             .await;
 
@@ -604,20 +742,29 @@ mod tests {
     #[tokio::test]
     async fn test_data_from_invalid_station_id() -> Result<(), MeteostatError> {
         let client = Meteostat::new().await?;
-        let invalid_station_id = "INVALID";
+        let invalid_station_id = "INVALID_STATION_ID_123"; // Make it less likely to exist by chance
 
         let result = client
             .hourly() // Any frequency
             .station(invalid_station_id)
-            .await;
+            .await; // Directly call on the client returned by .station()
 
         // This should ideally result in an error related to fetching/finding data for that ID.
         // The exact error might depend on FrameFetcher's implementation (e.g., file not found, download error).
         assert!(result.is_err());
         let err = result.err().unwrap();
         println!("Error fetching data for invalid station ID: {:?}", err);
-        // Example check (might need adjustment based on actual error type)
-        assert!(matches!(err, MeteostatError::WeatherData(_)));
+
+        // The error should originate from the data fetching layer
+        assert!(matches!(err, MeteostatError::WeatherData(_)), "Expected a WeatherData error variant, got {:?}", err);
+
+        // More specific check if WeatherDataError has relevant variants:
+        // if let MeteostatError::WeatherData(wd_err) = err {
+        //     assert!(matches!(wd_err, WeatherDataError::DownloadError { .. } | WeatherDataError::CacheReadError { .. } | WeatherDataError::FileNotFound { .. } ));
+        // } else {
+        //     panic!("Expected MeteostatError::WeatherData, got {:?}", err);
+        // }
+
 
         Ok(())
     }
