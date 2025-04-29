@@ -366,7 +366,7 @@ impl StationLocator {
                 start: req_s,
                 end: req_e,
             } => inv_start <= *req_s && inv_end >= *req_e,
-            RequiredData::Year(year) => {
+            RequiredData::FullYear(year) => {
                 let Some(req_start) = NaiveDate::from_ymd_opt(*year, 1, 1) else {
                     return false;
                 };
@@ -399,7 +399,7 @@ impl StationLocator {
                 let req_e_y = req_e.year();
                 inv_start_y <= req_s_y && inv_end_y >= req_e_y
             }
-            RequiredData::Year(year) => {
+            RequiredData::FullYear(year) => {
                 let req_y = *year;
                 inv_start_y <= req_y && req_y <= inv_end_y
             }

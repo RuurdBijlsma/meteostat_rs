@@ -93,10 +93,10 @@ impl AnyDateTime for Year {
     }
 }
 
-impl AnyDateTime for (Year, Month) {
+impl AnyDateTime for Month {
     fn get_datetime_range(self) -> Option<StartEndDateTime> {
-        let year = self.0.get();
-        let month = self.1.get();
+        let year = self.year();
+        let month = self.month();
 
         let start_naive = NaiveDate::from_ymd_opt(year, month, 1)?.and_hms_opt(0, 0, 0)?;
         let start = DateTime::<Utc>::from_naive_utc_and_offset(start_naive, Utc);

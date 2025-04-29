@@ -40,10 +40,10 @@ impl AnyDate for Year {
     }
 }
 
-impl AnyDate for (Year, Month) {
+impl AnyDate for Month {
     fn get_date_range(self) -> Option<StartEndDate> {
-        let year = self.0.get();
-        let month = self.1.get();
+        let year = self.year();
+        let month = self.month();
         Some(StartEndDate {
             start: NaiveDate::from_ymd_opt(year, month, 1)?,
             end: NaiveDate::from_ymd_opt(year, month, days_in_month(year, month)?)?,

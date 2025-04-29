@@ -1,6 +1,7 @@
-use crate::types::traits::types::{Month, Year};
+use crate::types::traits::types::Year;
 use polars::prelude::{col, lit, Expr, LazyFrame};
 
+#[allow(dead_code)]
 pub struct Climate {
     start_year: i32,
     end_year: i32,
@@ -13,25 +14,27 @@ pub struct Climate {
     sunshine_minutes: i32,
 }
 
-pub struct ClimateFrame {
-    frame: LazyFrame,
+pub struct ClimateLazyFrame {
+    pub frame: LazyFrame,
 }
 
-impl ClimateFrame {
+impl ClimateLazyFrame {
     pub fn new(frame: LazyFrame) -> Self {
         Self { frame }
     }
 
-    pub fn filter(&self, predicate: Expr) -> ClimateFrame {
-        ClimateFrame::new(self.frame.clone().filter(predicate))
+    pub fn filter(&self, predicate: Expr) -> ClimateLazyFrame {
+        ClimateLazyFrame {
+            frame: self.frame.clone().filter(predicate),
+        }
     }
 
-    pub fn get_at(&self, start_year: Year, end_year: Year, month: Month) -> ClimateFrame {
+    pub fn get_at(&self, start_year: Year, end_year: Year, month: u32) -> ClimateLazyFrame {
         self.filter(
             col("start_year")
                 .eq(lit(start_year.get()))
                 .and(col("end_year").eq(lit(end_year.get())))
-                .and(col("month").eq(lit(month.get()))),
+                .and(col("month").eq(lit(month))),
         )
     }
 }

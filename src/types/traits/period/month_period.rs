@@ -7,8 +7,8 @@ pub trait MonthPeriod {
 impl MonthPeriod for Year {
     fn get_month_period(self) -> Option<StartEndMonth> {
         Some(StartEndMonth {
-            start: (self, Month(1)),
-            end: (self, Month(12))
+            start: Month(self.0, 1),
+            end: Month(self.0, 12),
         })
     }
 }

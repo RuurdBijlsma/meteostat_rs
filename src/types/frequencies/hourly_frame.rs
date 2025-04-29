@@ -4,6 +4,7 @@ use crate::{MeteostatError, WeatherCondition};
 use chrono::{DateTime, Duration, Timelike, Utc};
 use polars::prelude::{col, lit, Expr, LazyFrame};
 
+#[allow(dead_code)]
 pub struct Hourly {
     datetime: DateTime<Utc>,
     temperature: f64,
@@ -19,24 +20,24 @@ pub struct Hourly {
     condition: WeatherCondition,
 }
 
-pub struct HourlyFrame {
-    frame: LazyFrame,
+pub struct HourlyLazyFrame {
+    pub frame: LazyFrame,
 }
 
-impl HourlyFrame {
+impl HourlyLazyFrame {
     pub fn new(frame: LazyFrame) -> Self {
         Self { frame }
     }
 
-    pub fn filter(&self, predicate: Expr) -> HourlyFrame {
-        HourlyFrame::new(self.frame.clone().filter(predicate))
+    pub fn filter(&self, predicate: Expr) -> HourlyLazyFrame {
+        HourlyLazyFrame::new(self.frame.clone().filter(predicate))
     }
 
     pub fn get_range(
         &self,
         start: impl AnyDateTime,
         end: impl AnyDateTime,
-    ) -> Result<HourlyFrame, MeteostatError> {
+    ) -> Result<HourlyLazyFrame, MeteostatError> {
         let start_utc = start
             .get_datetime_range()
             .ok_or(MeteostatError::DateParsingError)?
@@ -55,7 +56,7 @@ impl HourlyFrame {
         ))
     }
 
-    pub fn get_at(&self, date: impl AnyDateTime) -> Result<HourlyFrame, MeteostatError> {
+    pub fn get_at(&self, date: impl AnyDateTime) -> Result<HourlyLazyFrame, MeteostatError> {
         let date_utc = date
             .get_datetime_range()
             .ok_or(MeteostatError::DateParsingError)?
@@ -84,7 +85,7 @@ impl HourlyFrame {
     pub fn get_for_period(
         &self,
         period: impl DateTimePeriod,
-    ) -> Result<HourlyFrame, MeteostatError> {
+    ) -> Result<HourlyLazyFrame, MeteostatError> {
         let period = period
             .get_datetime_period()
             .ok_or(MeteostatError::DateParsingError)?;
