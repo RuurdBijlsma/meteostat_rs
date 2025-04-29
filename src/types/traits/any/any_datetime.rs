@@ -38,18 +38,12 @@ impl AnyDateTime for DateTime<FixedOffset> {
 
 impl AnyDateTime for NaiveDate {
     fn get_datetime_range(self) -> Option<StartEndDateTime> {
-        let Some(start) = self
+        let start = self
             .and_hms_opt(0, 0, 0)
-            .map(|dt| DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc))
-        else {
-            return None;
-        };
-        let Some(end) = self
+            .map(|dt| DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc))?;
+        let end = self
             .and_hms_micro_opt(23, 59, 59, 999_999)
-            .map(|dt| DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc))
-        else {
-            return None;
-        };
+            .map(|dt| DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc))?;
         Some(StartEndDateTime { start, end })
     }
 }

@@ -28,7 +28,7 @@ pub struct LatLon(pub f64, pub f64);
 
 /// Represents criteria for filtering weather stations based on their data inventory.
 ///
-/// Used in conjunction with [`Meteostat::find_stations`] to find stations that
+/// Used in conjunction with [`crate::Meteostat::find_stations`] to find stations that
 /// report having data for a specific frequency and meeting certain data coverage requirements.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct InventoryRequest {
@@ -58,7 +58,7 @@ impl InventoryRequest {
 /// Provides methods to fetch weather data (hourly, daily, monthly, climate)
 /// and find weather stations. Handles data caching internally.
 ///
-/// Create instances using [`Meteostat::new`] or [`Meteostat::with_cache_folder`].
+/// Create instances using [`crate::Meteostat::new`] or [`crate::Meteostat::with_cache_folder`].
 pub struct Meteostat {
     fetcher: FrameFetcher,
     station_locator: StationLocator,
@@ -340,16 +340,14 @@ impl Meteostat {
             .unwrap_or((None, None)); // Pass None otherwise
 
         // Perform the query using the station locator
-        let stations_with_distance = self
-            .station_locator
-            .query(
-                location.0,
-                location.1,
-                stations_limit,
-                max_distance_km,
-                freq_option,
-                date_option,
-            );
+        let stations_with_distance = self.station_locator.query(
+            location.0,
+            location.1,
+            stations_limit,
+            max_distance_km,
+            freq_option,
+            date_option,
+        );
 
         // Extract stations and discard distances
         Ok(stations_with_distance
@@ -431,16 +429,14 @@ impl Meteostat {
         let stations_limit = station_limit.unwrap_or(1);
 
         // Query for candidate stations
-        let stations = self
-            .station_locator
-            .query(
-                location.0,
-                location.1,
-                stations_limit, // Limit the number of candidates fetched
-                max_distance_km,
-                Some(frequency), // Always filter by frequency for from_location
-                required_data,   // Apply optional date/inventory filter
-            );
+        let stations = self.station_locator.query(
+            location.0,
+            location.1,
+            stations_limit, // Limit the number of candidates fetched
+            max_distance_km,
+            Some(frequency), // Always filter by frequency for from_location
+            required_data,   // Apply optional date/inventory filter
+        );
 
         // Handle case where no stations are found matching the criteria
         if stations.is_empty() {
@@ -756,7 +752,11 @@ mod tests {
         println!("Error fetching data for invalid station ID: {:?}", err);
 
         // The error should originate from the data fetching layer
-        assert!(matches!(err, MeteostatError::WeatherData(_)), "Expected a WeatherData error variant, got {:?}", err);
+        assert!(
+            matches!(err, MeteostatError::WeatherData(_)),
+            "Expected a WeatherData error variant, got {:?}",
+            err
+        );
 
         // More specific check if WeatherDataError has relevant variants:
         // if let MeteostatError::WeatherData(wd_err) = err {
@@ -764,7 +764,6 @@ mod tests {
         // } else {
         //     panic!("Expected MeteostatError::WeatherData, got {:?}", err);
         // }
-
 
         Ok(())
     }

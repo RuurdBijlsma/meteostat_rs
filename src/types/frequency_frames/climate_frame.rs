@@ -28,15 +28,15 @@ struct Climate {
 /// This struct provides methods tailored for common operations on climate normals datasets,
 /// while retaining the benefits of lazy evaluation provided by Polars.
 ///
-/// Instances are typically obtained via [`Meteostat::climate`].
+/// Instances are typically obtained via [`crate::Meteostat::climate`].
 ///
 /// # Errors
 ///
 /// Operations that trigger computation on the underlying `LazyFrame` (e.g., calling `.collect()`)
-/// can potentially return a [`PolarsError`] if the computation fails (e.g., due to type mismatches
+/// can potentially return a [`polars::prelude::PolarsError`] if the computation fails (e.g., due to type mismatches
 /// or invalid operations).
 ///
-/// The initial creation via [`Meteostat::climate`] methods can return a [`MeteostatError`] if
+/// The initial creation via [`crate::Meteostat::climate`] methods can return a [`crate::MeteostatError`] if
 /// data fetching or station lookup fails.
 #[derive(Clone)]
 pub struct ClimateLazyFrame {
@@ -47,7 +47,7 @@ pub struct ClimateLazyFrame {
 impl ClimateLazyFrame {
     /// Creates a new `ClimateLazyFrame` wrapping the given Polars `LazyFrame`.
     ///
-    /// This is typically called internally by the [`Meteostat`] client methods.
+    /// This is typically called internally by the [`crate::Meteostat`] client methods.
     ///
     /// # Arguments
     ///
@@ -97,7 +97,7 @@ impl ClimateLazyFrame {
     ///
     /// While this method itself doesn't typically error (it just builds the query plan),
     /// subsequent operations like `.collect()` on the returned `frame` might return a
-    /// [`PolarsError`] if the expression is invalid or encounters issues during execution.
+    /// [`polars::prelude::PolarsError`] if the expression is invalid or encounters issues during execution.
     pub fn filter(&self, predicate: Expr) -> ClimateLazyFrame {
         ClimateLazyFrame {
             // Need to clone the frame to apply the filter without modifying the original
@@ -151,7 +151,7 @@ impl ClimateLazyFrame {
     ///
     /// # Errors
     ///
-    /// Similar to [`filter`], this method modifies the lazy query plan. Errors ([`PolarsError`])
+    /// Similar to [`LazyFrame::filter`], this method modifies the lazy query plan. Errors ([`polars::prelude::PolarsError`])
     /// may occur during subsequent computation (e.g., `.collect()`).
     pub fn get_at(&self, start_year: Year, end_year: Year, month: u32) -> ClimateLazyFrame {
         self.filter(
@@ -225,7 +225,7 @@ mod tests {
         // Verify the values in that row
 
         // Extract values by column name
-        let row_start_year =df.column("start_year")?.i64()?.get(0).unwrap();
+        let row_start_year = df.column("start_year")?.i64()?.get(0).unwrap();
         let row_end_year = df.column("end_year")?.i64()?.get(0).unwrap();
         let row_month = df.column("month")?.i64()?.get(0).unwrap();
 

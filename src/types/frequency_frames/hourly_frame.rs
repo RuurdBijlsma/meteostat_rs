@@ -32,7 +32,7 @@ struct Hourly {
 /// This struct provides methods tailored for common operations on hourly datasets,
 /// such as filtering by datetime ranges, while retaining the benefits of lazy evaluation.
 ///
-/// Instances are typically obtained via [`Meteostat::hourly`].
+/// Instances are typically obtained via [`crate::Meteostat::hourly`].
 ///
 /// # Note on Datetimes
 ///
@@ -45,12 +45,12 @@ struct Hourly {
 /// # Errors
 ///
 /// Operations that trigger computation on the underlying `LazyFrame` (e.g., calling `.collect()`)
-/// can potentially return a [`PolarsError`].
+/// can potentially return a [`polars::prelude::PolarsError`].
 ///
 /// Methods involving datetime parsing or range generation (`get_range`, `get_at`, `get_for_period`)
 /// can return [`MeteostatError::DateParsingError`] if the input datetimes cannot be resolved.
 ///
-/// The initial creation via [`Meteostat::hourly`] methods can return a [`MeteostatError`] if
+/// The initial creation via [`crate::Meteostat::hourly`] methods can return a [`MeteostatError`] if
 /// data fetching or station lookup fails.
 #[derive(Clone)] // Added Clone for convenience
 pub struct HourlyLazyFrame {
@@ -61,12 +61,12 @@ pub struct HourlyLazyFrame {
 impl HourlyLazyFrame {
     /// Creates a new `HourlyLazyFrame` wrapping the given Polars `LazyFrame`.
     ///
-    /// This is typically called internally by the [`Meteostat`] client methods.
+    /// This is typically called internally by the [`crate::Meteostat`] client methods.
     ///
     /// # Arguments
     ///
     /// * `frame` - A `LazyFrame` assumed to contain hourly weather data with the expected schema,
-    ///             including a "datetime" column interpretable as timezone-naive UTC.
+    ///   including a "datetime" column interpretable as timezone-naive UTC.
     pub fn new(frame: LazyFrame) -> Self {
         Self { frame }
     }
@@ -111,7 +111,7 @@ impl HourlyLazyFrame {
     /// # Errors
     ///
     /// While this method itself doesn't typically error, subsequent operations like `.collect()`
-    /// might return a [`PolarsError`].
+    /// might return a [`polars::prelude::PolarsError`].
     pub fn filter(&self, predicate: Expr) -> HourlyLazyFrame {
         HourlyLazyFrame::new(self.frame.clone().filter(predicate))
     }
@@ -163,7 +163,7 @@ impl HourlyLazyFrame {
     /// # Errors
     ///
     /// Returns [`MeteostatError::DateParsingError`] if `start` or `end` cannot be resolved to a `DateTime<Utc>`.
-    /// Subsequent `.collect()` calls might return a [`PolarsError`].
+    /// Subsequent `.collect()` calls might return a [`polars::prelude::PolarsError`].
     pub fn get_range(
         &self,
         start: impl AnyDateTime,
@@ -182,7 +182,7 @@ impl HourlyLazyFrame {
         // Convert to NaiveDateTime for filtering the Polars frame
         let start_naive = start_utc.naive_utc();
         let end_naive = end_utc.naive_utc();
-        
+
         dbg!(&start_naive);
         dbg!(&end_naive);
 
@@ -247,7 +247,7 @@ impl HourlyLazyFrame {
     /// # Errors
     ///
     /// Returns [`MeteostatError::DateParsingError`] if `datetime` cannot be resolved.
-    /// Subsequent `.collect()` calls might return a [`PolarsError`].
+    /// Subsequent `.collect()` calls might return a [`polars::prelude::PolarsError`].
     pub fn get_at(&self, datetime: impl AnyDateTime) -> Result<HourlyLazyFrame, MeteostatError> {
         let date_utc = datetime
             .get_datetime_range()
@@ -318,7 +318,7 @@ impl HourlyLazyFrame {
     /// # Errors
     ///
     /// Returns [`MeteostatError::DateParsingError`] if `period` cannot be resolved to a datetime range.
-    /// Subsequent `.collect()` calls might return a [`PolarsError`].
+    /// Subsequent `.collect()` calls might return a [`polars::prelude::PolarsError`].
     pub fn get_for_period(
         &self,
         period: impl DateTimePeriod,
@@ -444,7 +444,7 @@ mod tests {
             target_dt_round_up
         );
         let dt_ms = df_round_up.column("datetime")?.datetime()?.get(0).unwrap();
-        let retrieved_round_up_naive_dt =ms_to_datetime(dt_ms);
+        let retrieved_round_up_naive_dt = ms_to_datetime(dt_ms);
         assert_eq!(
             retrieved_round_up_naive_dt,
             expected_hour_start_round_up_naive

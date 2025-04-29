@@ -13,13 +13,13 @@ use polars::prelude::{col, lit, Expr, LazyFrame};
 #[allow(dead_code)]
 struct Monthly {
     year: i32,
-    month: u32, // Month should be u32 (1-12)
+    month: u32,                       // Month should be u32 (1-12)
     average_temperature: Option<f64>, // Use Option<f64> for potentially missing float values
     minimum_temperature: Option<f64>,
     maximum_temperature: Option<f64>,
-    precipitation: Option<f64>, // Precipitation sum
-    wind_speed: Option<f64>,    // Average wind speed
-    pressure: Option<f64>,     // Average pressure
+    precipitation: Option<f64>,    // Precipitation sum
+    wind_speed: Option<f64>,       // Average wind speed
+    pressure: Option<f64>,         // Average pressure
     sunshine_minutes: Option<i32>, // Total sunshine duration (might be integer)
 }
 
@@ -28,17 +28,17 @@ struct Monthly {
 /// This struct provides methods tailored for common operations on monthly datasets,
 /// such as filtering by month ranges or specific years, while retaining the benefits of lazy evaluation.
 ///
-/// Instances are typically obtained via [`Meteostat::monthly`].
+/// Instances are typically obtained via [`crate::Meteostat::monthly`].
 ///
 /// # Errors
 ///
 /// Operations that trigger computation on the underlying `LazyFrame` (e.g., calling `.collect()`)
-/// can potentially return a [`PolarsError`].
+/// can potentially return a [`polars::prelude::PolarsError`].
 ///
 /// Methods involving month/year parsing or range generation (`get_range`, `get_at`, `get_for_period`)
 /// can return [`MeteostatError::DateParsingError`] if the input cannot be resolved.
 ///
-/// The initial creation via [`Meteostat::monthly`] methods can return a [`MeteostatError`] if
+/// The initial creation via [`crate::Meteostat::monthly`] methods can return a [`MeteostatError`] if
 /// data fetching or station lookup fails.
 #[derive(Clone)] // Added Clone for convenience
 pub struct MonthlyLazyFrame {
@@ -49,12 +49,12 @@ pub struct MonthlyLazyFrame {
 impl MonthlyLazyFrame {
     /// Creates a new `MonthlyLazyFrame` wrapping the given Polars `LazyFrame`.
     ///
-    /// This is typically called internally by the [`Meteostat`] client methods.
+    /// This is typically called internally by the [`crate::Meteostat`] client methods.
     ///
     /// # Arguments
     ///
     /// * `frame` - A `LazyFrame` assumed to contain monthly weather data with the expected schema
-    ///             (columns like "year", "month", "tavg", "prcp", etc.).
+    ///   (columns like "year", "month", "tavg", "prcp", etc.).
     pub fn new(frame: LazyFrame) -> Self {
         Self { frame }
     }
@@ -99,7 +99,7 @@ impl MonthlyLazyFrame {
     /// # Errors
     ///
     /// While this method itself doesn't typically error, subsequent operations like `.collect()`
-    /// might return a [`PolarsError`].
+    /// might return a [`polars::prelude::PolarsError`].
     pub fn filter(&self, predicate: Expr) -> MonthlyLazyFrame {
         MonthlyLazyFrame::new(self.frame.clone().filter(predicate))
     }
@@ -151,7 +151,7 @@ impl MonthlyLazyFrame {
     /// # Errors
     ///
     /// Returns [`MeteostatError::DateParsingError`] if `start` or `end` cannot be resolved to a `Month`.
-    /// Subsequent `.collect()` calls might return a [`PolarsError`].
+    /// Subsequent `.collect()` calls might return a [`polars::prelude::PolarsError`].
     pub fn get_range(
         &self,
         start: impl AnyMonth,
@@ -170,7 +170,7 @@ impl MonthlyLazyFrame {
         let start_year = start_month_obj.year();
         let end_year = end_month_obj.year();
         let start_month_num = start_month_obj.month(); // u32
-        let end_month_num = end_month_obj.month();     // u32
+        let end_month_num = end_month_obj.month(); // u32
 
         // Build the filter expression
         // Condition: (year > start_year) OR (year == start_year AND month >= start_month_num)
@@ -238,7 +238,7 @@ impl MonthlyLazyFrame {
     /// # Errors
     ///
     /// Returns [`MeteostatError::DateParsingError`] if `month_spec` cannot be resolved to a `Month`.
-    /// Subsequent `.collect()` calls might return a [`PolarsError`].
+    /// Subsequent `.collect()` calls might return a [`polars::prelude::PolarsError`].
     pub fn get_at(&self, month_spec: impl AnyMonth) -> Result<MonthlyLazyFrame, MeteostatError> {
         // Use the start of the range provided by AnyMonth for the equality check
         let month_obj = month_spec
@@ -296,7 +296,7 @@ impl MonthlyLazyFrame {
     /// # Errors
     ///
     /// Returns [`MeteostatError::DateParsingError`] if `period` cannot be resolved to a month range.
-    /// Subsequent `.collect()` calls might return a [`PolarsError`].
+    /// Subsequent `.collect()` calls might return a [`polars::prelude::PolarsError`].
     pub fn get_for_period(
         &self,
         period: impl MonthPeriod,
@@ -402,7 +402,7 @@ mod tests {
     {
         let monthly_lazy = get_test_monthly_frame().await?;
         let start_month = Month::new(11, 2019); // Nov 2019
-        let end_month = Month::new(2, 2020);   // Feb 2020
+        let end_month = Month::new(2, 2020); // Feb 2020
         let expected_rows = 4; // Nov, Dec, Jan, Feb
 
         let result_lazy = monthly_lazy.get_range(start_month, end_month)?;
@@ -483,8 +483,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_monthly_frame_chaining_period_and_filter() -> Result<(), Box<dyn std::error::Error>>
-    {
+    async fn test_monthly_frame_chaining_period_and_filter(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let monthly_lazy = get_test_monthly_frame().await?;
         let target_year = Year(2016);
 

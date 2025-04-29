@@ -31,17 +31,17 @@ struct Daily {
 /// This struct provides methods tailored for common operations on daily datasets,
 /// such as filtering by date ranges, while retaining the benefits of lazy evaluation.
 ///
-/// Instances are typically obtained via [`Meteostat::daily`].
+/// Instances are typically obtained via [`crate::Meteostat::daily`].
 ///
 /// # Errors
 ///
 /// Operations that trigger computation on the underlying `LazyFrame` (e.g., calling `.collect()`)
-/// can potentially return a [`PolarsError`] if the computation fails.
+/// can potentially return a [`polars::prelude::PolarsError`] if the computation fails.
 ///
 /// Methods involving date parsing or range generation (`get_range`, `get_at`, `get_for_period`)
 /// can return [`MeteostatError::DateParsingError`] if the input dates cannot be resolved.
 ///
-/// The initial creation via [`Meteostat::daily`] methods can return a [`MeteostatError`] if
+/// The initial creation via [`crate::Meteostat::daily`] methods can return a [`MeteostatError`] if
 /// data fetching or station lookup fails.
 #[derive(Clone)] // Added Clone for convenience
 pub struct DailyLazyFrame {
@@ -52,7 +52,7 @@ pub struct DailyLazyFrame {
 impl DailyLazyFrame {
     /// Creates a new `DailyLazyFrame` wrapping the given Polars `LazyFrame`.
     ///
-    /// This is typically called internally by the [`Meteostat`] client methods.
+    /// This is typically called internally by the [`crate::Meteostat`] client methods.
     ///
     /// # Arguments
     ///
@@ -101,7 +101,7 @@ impl DailyLazyFrame {
     /// # Errors
     ///
     /// While this method itself doesn't typically error, subsequent operations like `.collect()`
-    /// might return a [`PolarsError`].
+    /// might return a [`polars::prelude::PolarsError`].
     pub fn filter(&self, predicate: Expr) -> DailyLazyFrame {
         DailyLazyFrame::new(self.frame.clone().filter(predicate))
     }
@@ -152,7 +152,7 @@ impl DailyLazyFrame {
     /// # Errors
     ///
     /// Returns [`MeteostatError::DateParsingError`] if `start` or `end` cannot be resolved to a `NaiveDate`.
-    /// Subsequent `.collect()` calls might return a [`PolarsError`].
+    /// Subsequent `.collect()` calls might return a [`polars::prelude::PolarsError`].
     pub fn get_range(
         &self,
         start: impl AnyDate,
@@ -224,7 +224,7 @@ impl DailyLazyFrame {
     /// # Errors
     ///
     /// Returns [`MeteostatError::DateParsingError`] if `date` cannot be resolved to a `NaiveDate`.
-    /// Subsequent `.collect()` calls might return a [`PolarsError`].
+    /// Subsequent `.collect()` calls might return a [`polars::prelude::PolarsError`].
     pub fn get_at(&self, date: impl AnyDate) -> Result<DailyLazyFrame, MeteostatError> {
         // Use the start of the range provided by AnyDate for the equality check
         let naive_date = date
@@ -275,7 +275,7 @@ impl DailyLazyFrame {
     /// # Errors
     ///
     /// Returns [`MeteostatError::DateParsingError`] if `period` cannot be resolved to a date range.
-    /// Subsequent `.collect()` calls might return a [`PolarsError`].
+    /// Subsequent `.collect()` calls might return a [`polars::prelude::PolarsError`].
     pub fn get_for_period(
         &self,
         period: impl DatePeriod,
@@ -370,7 +370,7 @@ mod tests {
         // Verify the date in that row
         let date_series = df.column("date")?.date()?;
         let retrieved_date = date_series.get(0).unwrap(); // Get date as i32 days since epoch
-        // Convert back to NaiveDate for comparison
+                                                          // Convert back to NaiveDate for comparison
         let epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
         let actual_date = epoch + chrono::Duration::days(retrieved_date as i64);
 
@@ -454,11 +454,7 @@ mod tests {
         let result_lazy = daily_lazy.get_range(start_date, end_date)?;
         let df = result_lazy.frame.collect()?;
 
-        assert_eq!(
-            df.height(),
-            0,
-            "Expected zero rows for a future date range"
-        );
+        assert_eq!(df.height(), 0, "Expected zero rows for a future date range");
 
         Ok(())
     }
