@@ -48,8 +48,8 @@ impl Frequency {
                 "year", "month", "tavg", "tmin", "tmax", "prcp", "wspd", "pres", "tsun",
             ],
             Frequency::Climate => vec![
-                "start_year", // Note: Corresponds to 'start' in Meteostat JSON
-                "end_year",   // Note: Corresponds to 'end' in Meteostat JSON
+                "start_year",
+                "end_year",
                 "month",
                 "tmin",
                 "tmax",
@@ -121,5 +121,5 @@ pub enum RequiredData {
     /// for [`Frequency::Monthly`] (checking if the year is within the monthly start/end years).
     ///
     /// **Example Use:** Find stations reporting daily data for the full year 2022.
-    Year(i32),
+    FullYear(i32),
 }

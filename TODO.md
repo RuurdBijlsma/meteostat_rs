@@ -6,3 +6,9 @@
 * waar is black box voor nodig in benches
 * check if documentation on #[builder] functions works (`find_stations`)
 * check cargo checklist (see exiftool)
+
+meteostat
+.hourly()
+.from_location()
+.location(asdf)
+.

@@ -1,8 +1,6 @@
 use chrono::{NaiveDate, TimeZone, Utc};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use meteostat::{
-    Frequency, InventoryRequest, LatLon, Meteostat, MeteostatFrameFilterExt, RequiredData,
-};
+use meteostat::{Frequency, InventoryRequest, LatLon, Meteostat, RequiredData, Year};
 use tokio::runtime::Runtime;
 
 fn bench(c: &mut Criterion) {
@@ -24,10 +22,8 @@ fn bench(c: &mut Criterion) {
         b.iter(|| {
             rt.block_on(async {
                 let _ = meteostat
-                    .from_station()
+                    .hourly()
                     .station(black_box(station_str))
-                    .frequency(black_box(Frequency::Hourly))
-                    .call()
                     .await
                     .unwrap();
             });
@@ -38,9 +34,8 @@ fn bench(c: &mut Criterion) {
         b.iter(|| {
             rt.block_on(async {
                 let _ = meteostat
-                    .from_location()
+                    .hourly()
                     .location(black_box(LatLon(50.038, 8.559)))
-                    .frequency(black_box(Frequency::Hourly))
                     .call()
                     .await
                     .unwrap();
@@ -52,9 +47,8 @@ fn bench(c: &mut Criterion) {
         b.iter(|| {
             rt.block_on(async {
                 let _ = meteostat
-                    .from_location()
+                    .daily()
                     .location(black_box(LatLon(50.038, 8.559)))
-                    .frequency(black_box(Frequency::Daily))
                     .call()
                     .await
                     .unwrap();
@@ -66,9 +60,8 @@ fn bench(c: &mut Criterion) {
         b.iter(|| {
             rt.block_on(async {
                 let _ = meteostat
-                    .from_location()
+                    .monthly()
                     .location(black_box(LatLon(50.038, 8.559)))
-                    .frequency(black_box(Frequency::Monthly))
                     .call()
                     .await
                     .unwrap();
@@ -80,9 +73,8 @@ fn bench(c: &mut Criterion) {
         b.iter(|| {
             rt.block_on(async {
                 let _ = meteostat
-                    .from_location()
+                    .climate()
                     .location(black_box(LatLon(50.038, 8.559)))
-                    .frequency(black_box(Frequency::Climate))
                     .call()
                     .await
                     .unwrap();
@@ -97,15 +89,14 @@ fn bench(c: &mut Criterion) {
                 let end_utc = Utc.with_ymd_and_hms(2023, 10, 26, 23, 59, 59).unwrap();
 
                 let lazy_frame = meteostat
-                    .from_location()
+                    .hourly()
                     .location(black_box(LatLon(50.038, 8.559)))
-                    .frequency(black_box(Frequency::Hourly))
                     .call()
                     .await
                     .unwrap();
 
-                let filtered_lazy_frame = lazy_frame.filter_hourly(start_utc, end_utc);
-                let _ = filtered_lazy_frame.collect().unwrap();
+                let freq_lazy = lazy_frame.get_range(start_utc, end_utc).unwrap();
+                let _ = freq_lazy.frame.collect().unwrap();
             });
         });
     });
@@ -117,15 +108,14 @@ fn bench(c: &mut Criterion) {
                 let end_date = NaiveDate::from_ymd_opt(2023, 12, 31).unwrap();
 
                 let lazy_frame = meteostat
-                    .from_location()
+                    .daily()
                     .location(black_box(LatLon(50.038, 8.559)))
-                    .frequency(black_box(Frequency::Daily))
                     .call()
                     .await
                     .unwrap();
 
-                let filtered_lazy_frame = lazy_frame.filter_daily(start_date, end_date);
-                let _ = filtered_lazy_frame.collect().unwrap();
+                let filtered_lazy_frame = lazy_frame.get_range(start_date, end_date).unwrap();
+                let _ = filtered_lazy_frame.frame.collect().unwrap();
             });
         });
     });
@@ -134,15 +124,14 @@ fn bench(c: &mut Criterion) {
         b.iter(|| {
             rt.block_on(async {
                 let lazy_frame = meteostat
-                    .from_location()
+                    .monthly()
                     .location(black_box(LatLon(50.038, 8.559)))
-                    .frequency(black_box(Frequency::Monthly))
                     .call()
                     .await
                     .unwrap();
 
-                let filtered_lazy_frame = lazy_frame.filter_monthly(2020, 2022);
-                let _ = filtered_lazy_frame.collect().unwrap();
+                let filtered_lazy_frame = lazy_frame.get_range(Year(2020), Year(2022)).unwrap();
+                let _ = filtered_lazy_frame.frame.collect().unwrap();
             });
         });
     });
@@ -151,18 +140,17 @@ fn bench(c: &mut Criterion) {
         b.iter(|| {
             rt.block_on(async {
                 let lazy_frame = meteostat
-                    .from_location()
+                    .climate()
                     .location(black_box(LatLon(50.038, 8.559)))
-                    .frequency(black_box(Frequency::Climate))
                     .call()
                     .await
                     .unwrap();
 
                 // Filter for the 1991-2020 climate period records specifically
-                let filtered_lazy_frame = lazy_frame.filter_climate(1991, 2020);
+                let filtered_lazy_frame = lazy_frame.get_at(Year(1991), Year(2020), 11);
 
                 // collect() handles potential errors
-                let _ = filtered_lazy_frame.collect().unwrap();
+                let _ = filtered_lazy_frame.frame.collect().unwrap();
             });
         });
     });
@@ -176,7 +164,7 @@ fn bench(c: &mut Criterion) {
                     .station_limit(black_box(3))
                     .inventory_request(black_box(InventoryRequest::new(
                         Frequency::Hourly,
-                        RequiredData::Year(2020),
+                        RequiredData::FullYear(2020),
                     )))
                     .call()
                     .await

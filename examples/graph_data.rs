@@ -8,7 +8,7 @@
 
 use std::error::Error;
 
-use meteostat::{Frequency, LatLon, Meteostat, MeteostatFrameFilterExt};
+use meteostat::{LatLon, Meteostat, Year};
 use plotlars::{Axis, Line, LinePlot, Plot, Rgb, Text};
 use polars::prelude::*;
 
@@ -17,20 +17,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("Fetching weather data from Meteostat...");
 
     // 1. Create a Meteostat client
-    let meteostat = Meteostat::new().await?;
+    let client = Meteostat::new().await?;
 
     // 2. Define location and time range
     let location = LatLon(52.118641, 5.185589); // de Bilt
 
     // 3. Build and execute the query using meteostat
-    let weather_data: DataFrame = meteostat
-        .from_location() // Query by geographic coordinates
-        .location(location) // Set the location
-        .frequency(Frequency::Daily) // Request daily data
-        .call() // Execute the API call (returns LazyFrame)
+    let weather_data = client
+        .daily()
+        .location(location)
+        .call()
         .await?
-        .filter_daily_by_year(2023)? // Filter the LazyFrame by date range
-        .collect()?; // Collect the results into a DataFrame
+        .get_for_period(Year(2023))?
+        .frame
+        .collect()?;
 
     // 4. Plot the data
     println!("Generating temperature plot...");
