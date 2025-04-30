@@ -1,6 +1,6 @@
 [package]
 name = "meteostat"
-version = "0.2.2"
+version = "0.2.3"
 edition = "2021"
 license = "Apache-2.0"
 description = "Get historic weather data from thousands of weather stations around the world."
@@ -27,7 +27,7 @@ reqwest = { version = "0.12.15", features = ["blocking", "json", "gzip", "stream
 async-compression = { version = "0.4", features = ["tokio", "gzip"] }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = { version = "1.0", features = ["unbounded_depth"] }
-polars = { version = "0.46.0", features = ["lazy", "csv", "dtype-datetime", "temporal", "strings", "polars-io", "parquet"] }
+polars = { version = "0.46.0", features = ["lazy", "strings", "parquet"] }
 chrono = { version = "0.4.40", features = ["serde"] }
 tokio = { version = "1.44.2", features = ["full"] }
 futures-util = "0.3.31"
