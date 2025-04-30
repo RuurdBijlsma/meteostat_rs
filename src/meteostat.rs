@@ -703,8 +703,7 @@ impl Meteostat {
     /// # Errors
     ///
     /// Can return errors from either [`Meteostat::clear_station_list_cache`] or [`Meteostat::clear_weather_data_cache`].
-    /// See their documentation for specific error types ([`MeteostatError::CacheDeletionError`],
-    /// [`MeteostatError::Io`], [`MeteostatError::WeatherData`]).
+    /// See their documentation for specific error types ([`MeteostatError::CacheDeletionError`], [`MeteostatError::WeatherData`]).
     ///
     /// # Example
     ///
@@ -744,9 +743,9 @@ impl Meteostat {
     ///
     /// # Errors
     ///
-    /// Can return errors from [`clear_cache`] or [`rebuild_station_list_cache`]. See their
+    /// Can return errors from [`Meteostat::clear_cache`] or [`Meteostat::rebuild_station_list_cache`]. See their
     /// documentation for specific error types ([`MeteostatError::CacheDeletionError`],
-    /// [`MeteostatError::Io`], [`MeteostatError::WeatherData`], [`MeteostatError::LocateStation`]).
+    /// [`MeteostatError::WeatherData`], [`MeteostatError::LocateStation`]).
     ///
     /// # Example
     ///
