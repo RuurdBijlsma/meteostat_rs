@@ -19,36 +19,56 @@ impl FrameFetcher {
         }
     }
 
-    /// Gets a DataFrameExtractor for a given station and data source, using the cache if possible.
+    pub async fn clear_cache_all(&self) -> Result<(), WeatherDataError> {
+        let mut cache = self.lazyframe_cache.lock().await;
+        cache.clear();
+        Ok(())
+    }
+
+    pub async fn clear_cache(
+        &self,
+        station: &str,
+        frequency: Frequency,
+    ) -> Result<(), WeatherDataError> {
+        let mut cache = self.lazyframe_cache.lock().await;
+        cache.remove(&(station.to_string(), frequency));
+        Ok(())
+    }
+
+    /// Gets a LazyFrame for a given station and frequency, using the cache if possible.
     pub async fn get_cache_lazyframe(
         &self,
         station: &str,
-        data_source: Frequency,
+        frequency: Frequency,
     ) -> Result<LazyFrame, WeatherDataError> {
-        let key = (station.to_string(), data_source);
+        let key = (station.to_string(), frequency);
 
         // --- Fast path: Check if already in cache (read lock) ---
         {
+            // Lock asynchronously
             let cache = self.lazyframe_cache.lock().await;
-            if let Some(cached_extractor) = cache.get(&key) {
-                // Found in cache, return a clone.
-                return Ok(cached_extractor.clone());
+            if let Some(cached_frame) = cache.get(&key) {
+                // Found in cache, return a clone. LazyFrame clones are cheap.
+                return Ok(cached_frame.clone());
             }
             // Not in cache, release the lock before loading
         } // Lock guard is dropped here
 
-        // --- Slow path: Load the frame and create the extractor ---
+        // --- Slow path: Load the frame ---
         // This potentially long-running operation happens outside the lock
-        let loaded_frame = self.loader.get_frame(data_source, station).await?;
+        let loaded_frame = self.loader.get_frame(frequency, station).await?;
 
         // --- Insert into cache (write lock) ---
-        // Lock again to insert the created extractor
+        // Lock again to insert the created frame
+        // Lock asynchronously
         let mut cache = self.lazyframe_cache.lock().await;
 
         // Use Entry API to handle potential race condition:
+        // If another task loaded and inserted the same frame while we were loading,
+        // we avoid overwriting it and just return the existing one.
         match cache.entry(key) {
             Entry::Occupied(entry) => {
-                // Someone else created and inserted it while we were loading/creating.
+                // Someone else created and inserted it while we were loading.
                 // Use their version (clone it). Discard the one we just created.
                 Ok(entry.get().clone())
             }
