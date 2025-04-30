@@ -737,8 +737,8 @@ impl Meteostat {
 }
 #[cfg(test)]
 mod tests {
-    use std::ffi::OsStr;
     use super::*;
+    use std::ffi::OsStr;
     use std::fs;
     use std::path::Path;
     use tempfile::tempdir;

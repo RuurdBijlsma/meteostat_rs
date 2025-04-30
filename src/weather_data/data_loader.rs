@@ -55,9 +55,9 @@ impl WeatherDataLoader {
         match fs::metadata(&parquet_path).await {
             Ok(metadata) => {
                 // File exists, try to get modification time
-                let modified_system_time = metadata.modified().map_err(|e| {
-                    WeatherDataError::CacheMetadataRead(parquet_path.clone(), e)
-                })?;
+                let modified_system_time = metadata
+                    .modified()
+                    .map_err(|e| WeatherDataError::CacheMetadataRead(parquet_path.clone(), e))?;
 
                 // Convert SystemTime to chrono::DateTime<Utc>
                 let modified_datetime_utc: DateTime<Utc> = DateTime::from(modified_system_time);
@@ -168,10 +168,12 @@ impl WeatherDataLoader {
                 station: station_owned.clone(),
                 source: e,
             })?;
-            temp_file.write_all(&bytes).map_err(|e| WeatherDataError::CsvReadIo {
-                station: station_owned.clone(),
-                source: e,
-            })?;
+            temp_file
+                .write_all(&bytes)
+                .map_err(|e| WeatherDataError::CsvReadIo {
+                    station: station_owned.clone(),
+                    source: e,
+                })?;
             temp_file.flush().map_err(|e| WeatherDataError::CsvReadIo {
                 station: station_owned.clone(),
                 source: e,
@@ -224,11 +226,14 @@ impl WeatherDataLoader {
                     // Hourly logic remains the same...
                     lazy_df.with_columns([
                         // Create datetime first from string date and i64 hour
-                        (
-                            col("date").str().strptime(DataType::Date, date_options.clone(), lit("raise"))
-                                .cast(DataType::Datetime(TimeUnit::Milliseconds, None))
-                                + duration(DurationArgs::new().with_hours(col("hour").cast(DataType::Int64)))
-                        ).alias("datetime"),
+                        (col("date")
+                            .str()
+                            .strptime(DataType::Date, date_options.clone(), lit("raise"))
+                            .cast(DataType::Datetime(TimeUnit::Milliseconds, None))
+                            + duration(
+                                DurationArgs::new().with_hours(col("hour").cast(DataType::Int64)),
+                            ))
+                        .alias("datetime"),
                         // Cast numerical columns
                         col("date").cast(DataType::String),
                         col("hour").cast(DataType::Int64),
@@ -236,7 +241,7 @@ impl WeatherDataLoader {
                         col("dwpt").cast(DataType::Float64),
                         col("rhum").cast(DataType::Int64), // integer percentage
                         col("prcp").cast(DataType::Float64),
-                        col("snow").cast(DataType::Int64), 
+                        col("snow").cast(DataType::Int64),
                         col("wdir").cast(DataType::Int64), // Degrees
                         col("wspd").cast(DataType::Float64),
                         col("wpgt").cast(DataType::Float64),
@@ -244,12 +249,14 @@ impl WeatherDataLoader {
                         col("tsun").cast(DataType::Int64), // minutes
                         col("coco").cast(DataType::Int64), // Weather condition code
                     ])
-                },
+                }
                 Frequency::Daily => {
                     // Daily logic remains the same...
                     lazy_df.with_columns([
                         // Parse date string to Date type
-                        col("date").str().strptime(DataType::Date, date_options.clone(), lit("raise"))
+                        col("date")
+                            .str()
+                            .strptime(DataType::Date, date_options.clone(), lit("raise"))
                             .alias("date"), // Overwrite original string date column
                         // Cast numerical columns
                         col("tavg").cast(DataType::Float64),
@@ -263,7 +270,7 @@ impl WeatherDataLoader {
                         col("pres").cast(DataType::Float64),
                         col("tsun").cast(DataType::Int64),
                     ])
-                },
+                }
                 Frequency::Monthly => {
                     lazy_df.with_columns([
                         // Cast year and month first
@@ -278,7 +285,7 @@ impl WeatherDataLoader {
                         col("pres").cast(DataType::Float64),
                         col("tsun").cast(DataType::Int64),
                     ])
-                },
+                }
                 Frequency::Climate => {
                     // Climate logic remains the same...
                     lazy_df.with_columns([
@@ -294,19 +301,22 @@ impl WeatherDataLoader {
                         col("pres").cast(DataType::Float64),
                         col("tsun").cast(DataType::Int64),
                     ])
-                },
+                }
             };
 
             // Collect the lazy frame to apply transformations and handle potential errors
-            let typed_df = lazy_df.collect().map_err(|e| WeatherDataError::ColumnOperationError {
-                station: station_owned.clone(),
-                source: e,
-            })?;
-            
+            let typed_df =
+                lazy_df
+                    .collect()
+                    .map_err(|e| WeatherDataError::ColumnOperationError {
+                        station: station_owned.clone(),
+                        source: e,
+                    })?;
+
             Ok(typed_df) // Return the transformed DataFrame
         })
-            .await? // Unwrap the JoinError
-                    // Propagate the inner Result<DataFrame, WeatherDataError>
+        .await? // Unwrap the JoinError
+                // Propagate the inner Result<DataFrame, WeatherDataError>
     }
 
     /// Writes a DataFrame to a Parquet file asynchronously using spawn_blocking.

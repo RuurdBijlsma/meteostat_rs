@@ -105,7 +105,7 @@ pub enum WeatherDataError {
 
     #[error("Failed to calculate system time difference for {0:?}")]
     SystemTimeCalculation(PathBuf, #[source] SystemTimeError),
-    
+
     #[error("Failed to delete cache '{0}'")]
     CacheDeletionError(PathBuf, #[source] std::io::Error),
 }
