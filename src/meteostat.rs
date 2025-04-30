@@ -814,7 +814,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_clear_weather_data_cache() -> Result<(), Box<dyn std::error::Error>> {
-        // Keep Box<dyn Error> for flexibility
         let temp_dir = tempdir()?;
         let cache_path = temp_dir.path().to_path_buf();
         let client = Meteostat::with_cache_folder(cache_path.clone()).await?;

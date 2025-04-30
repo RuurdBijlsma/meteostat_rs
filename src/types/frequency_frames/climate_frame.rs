@@ -229,8 +229,6 @@ mod tests {
         let row_end_year = df.column("end_year")?.i64()?.get(0).unwrap();
         let row_month = df.column("month")?.i64()?.get(0).unwrap();
 
-        dbg!(row_start_year, row_end_year, row_month);
-
         assert_eq!(row_start_year, start_yr.get() as i64);
         assert_eq!(row_end_year, end_yr.get() as i64);
         assert_eq!(row_month, target_month as i64);

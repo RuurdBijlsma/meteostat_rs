@@ -123,3 +123,15 @@ pub enum RequiredData {
     /// **Example Use:** Find stations reporting daily data for the full year 2022.
     FullYear(i32),
 }
+
+impl RequiredData {
+    #[allow(dead_code)]
+    pub(crate) fn get_end_date(&self) -> Option<NaiveDate> {
+        match self {
+            RequiredData::Any => None,
+            RequiredData::SpecificDate(date) => Some(*date),
+            RequiredData::DateRange { start: _, end } => Some(*end),
+            RequiredData::FullYear(year) => NaiveDate::from_ymd_opt(*year, 12, 31),
+        }
+    }
+}

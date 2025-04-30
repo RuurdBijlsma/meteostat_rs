@@ -183,9 +183,6 @@ impl HourlyLazyFrame {
         let start_naive = start_utc.naive_utc();
         let end_naive = end_utc.naive_utc();
 
-        dbg!(&start_naive);
-        dbg!(&end_naive);
-
         Ok(self.filter(
             col("datetime")
                 .gt_eq(lit(start_naive))
