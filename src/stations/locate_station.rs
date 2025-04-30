@@ -13,13 +13,14 @@ use reqwest::Client;
 use rstar::RTree;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
+use std::fs::remove_file;
 use std::io::{self};
 use std::path::Path;
 use tokio::io::{AsyncReadExt, BufReader};
 use tokio_util::io::StreamReader;
 
 const DATA_URL: &str = "https://bulk.meteostat.net/v2/stations/lite.json.gz";
-const BINCODE_CACHE_FILE_NAME: &str = "stations_lite.bin";
+pub(crate) const BINCODE_CACHE_FILE_NAME: &str = "stations_lite.bin";
 const BINCODE_CONFIG: Configuration<LittleEndian, Fixint> =
     bincode::config::standard().with_fixed_int_encoding();
 
@@ -81,6 +82,7 @@ impl StationLocator {
             )?;
         Ok(decoded_stations)
     }
+
     async fn fetch_stations() -> Result<Vec<Station>, LocateStationError> {
         // ... implementation unchanged ...
         let client = Client::new();
@@ -125,6 +127,7 @@ impl StationLocator {
         );
         Ok(stations)
     }
+
     async fn cache_stations(
         stations: Vec<Station>,
         cache_path: &Path,
@@ -149,6 +152,20 @@ impl StationLocator {
         );
         Ok(())
     }
+
+    /// Clears the cache and rebuilds the rtree from fresh data
+    pub async fn rebuild_cache(&mut self, cache_dir: &Path) -> Result<(), LocateStationError> {
+        let cache_file = cache_dir.join(BINCODE_CACHE_FILE_NAME);
+        if cache_file.exists() {
+            remove_file(&cache_file)
+                .map_err(|e| LocateStationError::CacheWrite(cache_file.clone(), e))?;
+        }
+        let stations = Self::fetch_stations().await?;
+        Self::cache_stations(stations.clone(), &cache_file).await?;
+        self.rtree = RTree::bulk_load(stations);
+        Ok(())
+    }
+
     // --- End Caching/Fetching ---
 
     /// Finds up to N nearest stations matching the criteria. Uses a fast path for simple
@@ -407,7 +424,7 @@ impl StationLocator {
     }
 }
 
-// --- Tests Module (should still pass, calling the main `query` function) ---
+// --- Tests Module ---
 #[cfg(test)]
 mod tests {
     use super::*;

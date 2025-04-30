@@ -4,7 +4,7 @@
 //! different types of weather data (hourly, daily, monthly, climate normals)
 //! either by station ID or by geographical location.
 
-use crate::stations::locate_station::StationLocator;
+use crate::stations::locate_station::{StationLocator, BINCODE_CACHE_FILE_NAME};
 use crate::utils::{ensure_cache_dir_exists, get_cache_dir};
 use crate::weather_data::frame_fetcher::FrameFetcher;
 use crate::{
@@ -13,6 +13,8 @@ use crate::{
 };
 use bon::bon;
 use polars::prelude::LazyFrame;
+use std::ffi::OsStr;
+use std::io;
 use std::path::PathBuf;
 
 /// Represents a geographical coordinate using Latitude and Longitude.
@@ -28,7 +30,7 @@ pub struct LatLon(pub f64, pub f64);
 
 /// Represents criteria for filtering weather stations based on their data inventory.
 ///
-/// Used in conjunction with [`crate::Meteostat::find_stations`] to find stations that
+/// Used in conjunction with [`Meteostat::find_stations`] to find stations that
 /// report having data for a specific frequency and meeting certain data coverage requirements.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct InventoryRequest {
@@ -58,10 +60,11 @@ impl InventoryRequest {
 /// Provides methods to fetch weather data (hourly, daily, monthly, climate)
 /// and find weather stations. Handles data caching internally.
 ///
-/// Create instances using [`crate::Meteostat::new`] or [`crate::Meteostat::with_cache_folder`].
+/// Create instances using [`Meteostat::new`] or [`Meteostat::with_cache_folder`].
 pub struct Meteostat {
     fetcher: FrameFetcher,
     station_locator: StationLocator,
+    cache_folder: PathBuf,
 }
 
 #[bon]
@@ -122,6 +125,7 @@ impl Meteostat {
                 .await
                 .map_err(MeteostatError::from)?, // Converts LocateStationError
             fetcher: FrameFetcher::new(&cache_folder),
+            cache_folder,
         })
     }
 
@@ -478,16 +482,398 @@ impl Meteostat {
             last_error: last_error.map(Box::new), // Include the last error encountered
         })
     }
-}
 
+    /// Clears the cached station list file (`stations_lite.bin`).
+    ///
+    /// This removes the locally stored station metadata. This function doesn't
+    /// clear the in-memory tree of stations. To clear that, use [`Meteostat::rebuild_station_list_cache`].
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` on success.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MeteostatError::CacheDeletionError`] if the file cannot be removed
+    /// (e.g., due to permissions issues or if the file doesn't exist).
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use meteostat::Meteostat;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Meteostat::new().await?;
+    /// // ... use client ...
+    ///
+    /// client.clear_station_list_cache().await?;
+    /// println!("Station list cache cleared.");
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn clear_station_list_cache(&self) -> Result<(), MeteostatError> {
+        let stations_file = self.cache_folder.join(BINCODE_CACHE_FILE_NAME);
+        match tokio::fs::remove_file(&stations_file).await {
+            Ok(_) => Ok(()),
+            Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(()), // Not an error if already gone
+            Err(e) => Err(MeteostatError::CacheDeletionError(stations_file.clone(), e)),
+        }
+    }
+
+    /// Forces a rebuild of the station list cache.
+    ///
+    /// This method will delete the existing station cache file (if any)
+    /// and then immediately download and process the latest station metadata
+    /// from Meteostat, storing it in the cache.
+    ///
+    /// Note: This requires mutable access (`&mut self`) because it modifies the
+    /// internal `StationLocator` state.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` on success.
+    ///
+    /// # Errors
+    ///
+    /// Can return errors related to:
+    /// - Deleting the old cache file ([`MeteostatError::CacheDeletionError`]).
+    /// - Downloading or processing the new station data (propagated as [`MeteostatError::LocateStation`]).
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use meteostat::Meteostat;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut client = Meteostat::new().await?;
+    /// // ... use client ...
+    ///
+    /// // Ensure the station cache is up-to-date
+    /// client.rebuild_station_list_cache().await?;
+    /// println!("Station list cache rebuilt.");
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn rebuild_station_list_cache(&mut self) -> Result<(), MeteostatError> {
+        // Delegate the actual rebuilding (which includes clearing) to the locator
+        self.station_locator
+            .rebuild_cache(&self.cache_folder)
+            .await
+            .map_err(MeteostatError::from) // Convert LocateStationError
+    }
+
+    /// Clears the cached weather data file(s) for a specific station and frequency.
+    ///
+    /// Removes the `.parquet` file associated with the given station ID and data frequency
+    /// from the cache directory. Also clears any in-memory cache associated with this
+    /// specific data in the `FrameFetcher`.
+    ///
+    /// # Arguments
+    ///
+    /// * `station` - The ID of the station whose cache should be cleared.
+    /// * `frequency` - The [`Frequency`] of the data cache to clear (e.g., Hourly, Daily).
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` on success.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MeteostatError::CacheDeletionError`] if the parquet file cannot be removed.
+    /// Returns [`MeteostatError::WeatherData`] if clearing the internal `FrameFetcher` cache fails.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use meteostat::{Meteostat, Frequency};
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Meteostat::new().await?;
+    /// let station_id = "10382"; // Example: Berlin-Tegel
+    ///
+    /// // Fetch some data first to ensure it's cached
+    /// let _ = client.hourly().station(station_id).await?;
+    ///
+    /// // Clear only the hourly cache for this station
+    /// client.clear_weather_data_cache_per_station(station_id, Frequency::Hourly).await?;
+    /// println!("Hourly cache for station {} cleared.", station_id);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn clear_weather_data_cache_per_station(
+        &self,
+        station: &str,
+        frequency: Frequency,
+    ) -> Result<(), MeteostatError> {
+        let file =
+            self.cache_folder
+                .join(format!("{}-{}.parquet", frequency.path_segment(), station));
+        match tokio::fs::remove_file(&file).await {
+            Ok(_) => {}
+            Err(e) if e.kind() == io::ErrorKind::NotFound => {} // Not an error if already gone
+            Err(e) => return Err(MeteostatError::CacheDeletionError(file.clone(), e)),
+        }
+        // Also clear from the in-memory FrameFetcher cache
+        self.fetcher
+            .clear_cache(station, frequency)
+            .await
+            .map_err(MeteostatError::from) // Convert WeatherDataError
+    }
+
+    /// Clears all cached weather data files (`.parquet` files).
+    ///
+    /// Iterates through the cache directory and removes all files ending with the
+    /// `.parquet` extension. This effectively deletes all cached hourly, daily, monthly,
+    /// and climate normal data. The station list cache (`stations_lite.bin`) is **not** removed
+    /// by this method. Also clears the in-memory cache of the `FrameFetcher`.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` on success.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MeteostatError::CacheDeletionError`] if removing any specific parquet file fails.
+    /// Returns [`MeteostatError::WeatherData`] if clearing the internal `FrameFetcher` cache fails.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use meteostat::Meteostat;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Meteostat::new().await?;
+    /// // ... fetch some data ...
+    ///
+    /// // Clear all downloaded weather data
+    /// client.clear_weather_data_cache().await?;
+    /// println!("All weather data cache cleared.");
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn clear_weather_data_cache(&self) -> Result<(), MeteostatError> {
+        let mut entries = tokio::fs::read_dir(&self.cache_folder)
+            .await
+            .map_err(|e| MeteostatError::CacheDeletionError(self.cache_folder.clone(), e))?;
+
+        while let Some(entry) = entries
+            .next_entry()
+            .await
+            .map_err(|e| MeteostatError::CacheDeletionError(self.cache_folder.clone(), e))?
+        {
+            let file_path = entry.path();
+            if file_path.is_file() {
+                if let Some(extension) = file_path.extension() {
+                    if extension == OsStr::new("parquet") {
+                        match tokio::fs::remove_file(&file_path).await {
+                            Ok(_) => {}
+                            Err(e) if e.kind() == io::ErrorKind::NotFound => {} // Ignore if already gone
+                            Err(e) => {
+                                return Err(MeteostatError::CacheDeletionError(
+                                    file_path.clone(),
+                                    e,
+                                ))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // Also clear the FrameFetcher's internal cache
+        self.fetcher
+            .clear_cache_all()
+            .await
+            .map_err(MeteostatError::from)?;
+        Ok(())
+    }
+
+    /// Clears the entire cache directory.
+    ///
+    /// This removes both the cached station list (`stations_lite.bin`) and all
+    /// cached weather data files (`.parquet` files). It effectively combines
+    /// [`Meteostat::clear_station_list_cache`] and [`Meteostat::clear_weather_data_cache`].
+    ///
+    /// **Note**: this retains the in-memory`StationLocator` state, to clear that as well
+    /// you have to use [`Meteostat::clear_cache_and_rebuild`].
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` on success.
+    ///
+    /// # Errors
+    ///
+    /// Can return errors from either [`Meteostat::clear_station_list_cache`] or [`Meteostat::clear_weather_data_cache`].
+    /// See their documentation for specific error types ([`MeteostatError::CacheDeletionError`],
+    /// [`MeteostatError::Io`], [`MeteostatError::WeatherData`]).
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use meteostat::Meteostat;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Meteostat::new().await?;
+    /// // ... fetch data ...
+    ///
+    /// // Remove all cached files
+    /// client.clear_cache().await?;
+    /// println!("Complete cache cleared.");
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn clear_cache(&self) -> Result<(), MeteostatError> {
+        // Clear station list first
+        self.clear_station_list_cache().await?;
+        // Then clear weather data
+        self.clear_weather_data_cache().await?;
+        Ok(())
+    }
+
+    /// Clears the entire cache directory and then rebuilds the station list cache.
+    ///
+    /// This first removes all cached files (station list and weather data) and then
+    /// immediately downloads and rebuilds the station list cache. It's useful for
+    /// ensuring a completely fresh start while pre-populating the essential station metadata.
+    ///
+    /// Note: This requires mutable access (`&mut self`) because it modifies the
+    /// internal `StationLocator` state during the rebuild step.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` on success.
+    ///
+    /// # Errors
+    ///
+    /// Can return errors from [`clear_cache`] or [`rebuild_station_list_cache`]. See their
+    /// documentation for specific error types ([`MeteostatError::CacheDeletionError`],
+    /// [`MeteostatError::Io`], [`MeteostatError::WeatherData`], [`MeteostatError::LocateStation`]).
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use meteostat::Meteostat;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut client = Meteostat::new().await?;
+    /// // ... potentially use client ...
+    ///
+    /// // Clear everything and ensure station list is immediately available again
+    /// client.clear_cache_and_rebuild().await?;
+    /// println!("Cache cleared and station list rebuilt.");
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn clear_cache_and_rebuild(&mut self) -> Result<(), MeteostatError> {
+        self.clear_cache().await?;
+        self.rebuild_station_list_cache().await?;
+        Ok(())
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+    use std::path::Path;
     use tempfile::tempdir;
 
     // Helper to create a known location (Berlin Mitte)
     fn berlin_location() -> LatLon {
         LatLon(52.520008, 13.404954)
+    }
+
+    /// Helper function to check if a cache file exists
+    async fn cache_file_exists(cache_dir: &Path, station: &str, frequency: Frequency) -> bool {
+        let file = cache_dir.join(format!("{}-{}.parquet", frequency.path_segment(), station));
+        file.exists()
+    }
+
+    #[tokio::test]
+    async fn test_clear_weather_data_cache_per_station() -> Result<(), MeteostatError> {
+        let temp_dir = tempdir()?;
+        let cache_path = temp_dir.path().to_path_buf();
+        let client = Meteostat::with_cache_folder(cache_path.clone()).await?;
+
+        // Ensure station cache exists
+        let berlin = berlin_location();
+        let stations = client.find_stations().location(berlin).call().await?;
+        let station_id = &stations[0].id;
+        let _lf = client.hourly().station(station_id).await?;
+        println!("Found station ID: {}", station_id);
+        assert!(cache_file_exists(&cache_path, station_id, Frequency::Hourly).await);
+
+        // Clear cache for this station's hourly data
+        client
+            .clear_weather_data_cache_per_station(station_id, Frequency::Hourly)
+            .await?;
+
+        // Verify cache file is gone
+        assert!(!cache_file_exists(&cache_path, station_id, Frequency::Hourly).await);
+
+        temp_dir.close()?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_clear_weather_data_cache() -> Result<(), Box<dyn std::error::Error>> {
+        // Keep Box<dyn Error> for flexibility
+        let temp_dir = tempdir()?;
+        let cache_path = temp_dir.path().to_path_buf();
+        let client = Meteostat::with_cache_folder(cache_path.clone()).await?;
+
+        // Get some data of different types to populate cache
+        let berlin = berlin_location();
+        let _ = client.hourly().location(berlin).call().await?;
+        let _ = client.daily().location(berlin).call().await?;
+
+        // --- Optional: Sanity check before clearing (sync version) ---
+        let initial_file_count = fs::read_dir(&cache_path)?
+            .filter_map(Result::ok) // Ignore errors reading entries
+            .filter(|entry| entry.path().is_file()) // Keep only files
+            .count();
+        // Ensure more than just the stations file exists (assuming it's created early)
+        assert!(
+            initial_file_count > 1,
+            "Expected more than one file before clearing cache."
+        );
+
+        // --- Clear all cache (async operation) ---
+        client.clear_weather_data_cache().await?;
+
+        // --- Verify directory is empty except for stations file (sync version) ---
+        let mut file_count = 0;
+        let mut stations_file_found = false;
+        let stations_filename = OsStr::new(BINCODE_CACHE_FILE_NAME); // Define expected filename
+
+        // Iterate through the directory synchronously
+        for entry_result in fs::read_dir(&cache_path)? {
+            let entry = entry_result?; // Propagate IO errors
+            let path = entry.path();
+
+            if path.is_file() {
+                file_count += 1;
+                if entry.file_name() == stations_filename {
+                    stations_file_found = true;
+                }
+                println!("Found file after clear: {:?}", path); // Debug print
+            }
+        }
+
+        // --- Assertions ---
+        assert_eq!(
+            file_count, 1,
+            "Expected exactly one file to remain after clearing."
+        );
+        assert!(
+            stations_file_found,
+            "The remaining file should be 'stations_lite.bin'."
+        );
+
+        // Optional: Double check the path directly (redundant but sometimes helpful)
+        // let stations_path = cache_path.join(stations_filename);
+        // assert!(stations_path.exists() && stations_path.is_file());
+
+        temp_dir.close()?; // Clean up the temp directory
+        Ok(())
     }
 
     // --- Constructor Tests ---
@@ -757,13 +1143,6 @@ mod tests {
             "Expected a WeatherData error variant, got {:?}",
             err
         );
-
-        // More specific check if WeatherDataError has relevant variants:
-        // if let MeteostatError::WeatherData(wd_err) = err {
-        //     assert!(matches!(wd_err, WeatherDataError::DownloadError { .. } | WeatherDataError::CacheReadError { .. } | WeatherDataError::FileNotFound { .. } ));
-        // } else {
-        //     panic!("Expected MeteostatError::WeatherData, got {:?}", err);
-        // }
 
         Ok(())
     }

@@ -197,7 +197,7 @@ async fn main() -> Result<(), MeteostatError> {
     let specific_month = Month::new(7, 2023); // July 2023
     let single_month_lazy = monthly_lazy.get_at(specific_month)?;
     let single_month_df = single_month_lazy.frame.collect()?;
-    println!("\nMonthly data for {:?}:\n{}", specific_month, single_month_df); // Use Debug for Month
+    println!("\nMonthly data for {:?}:\n{}", specific_month, single_month_df);
 
     // --- Get Specific Climate Normals Row ---
     let climate_lazy = client.climate().station(station_id).await?;
@@ -260,13 +260,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
         weather_data.head(Some(5))
     );
 
-    plot_temperature(&weather_data)?;
+    plot_temperature(&weather_data);
 
     Ok(())
 }
 
-// Note: Added Result return type for potential polars errors in plot
-fn plot_temperature(dataset: &DataFrame) -> Result<(), PolarsError> {
+fn plot_temperature(dataset: &DataFrame) {
     LinePlot::builder()
         .data(dataset)
         .x("date")
@@ -285,9 +284,7 @@ fn plot_temperature(dataset: &DataFrame) -> Result<(), PolarsError> {
                 .size(18),
         )
         .build()
-        .plot(); // Assuming plot returns () or panics on error internally
-
-    Ok(())
+        .plot();
 }
 ```
 
