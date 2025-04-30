@@ -1,29 +1,142 @@
+//! Provides the `ClimateClient` for initiating requests for Meteostat climate normals data.
+//!
+//! This client acts as an intermediate builder, obtained via [`Meteostat::climate()`],
+//! allowing the user to specify the data source (station ID or location) before
+//! executing the request to fetch climate data.
+
 use crate::{ClimateLazyFrame, Frequency, LatLon, Meteostat, MeteostatError, RequiredData};
 use bon::bon;
 
+/// A client builder specifically for fetching climate normals data.
+///
+/// Instances are created by calling [`Meteostat::climate()`]. Methods on this struct
+/// allow specifying the target (a specific station ID or a geographical location)
+/// and optional parameters for location-based searches.
+///
+/// Calling `.station()` or `.location().call()` executes the request and returns a
+/// [`Result<ClimateLazyFrame, MeteostatError>`].
 pub struct ClimateClient<'a> {
+    /// A reference to the main Meteostat client instance.
     client: &'a Meteostat,
 }
 
 #[bon]
 impl<'a> ClimateClient<'a> {
-    pub fn new(client: &'a Meteostat) -> Self {
+    /// Creates a new `ClimateClient`.
+    ///
+    /// This is typically called internally by [`Meteostat::climate()`] and not directly by users.
+    ///
+    /// # Arguments
+    ///
+    /// * `client` - A reference to the configured `Meteostat` instance.
+    pub(crate) fn new(client: &'a Meteostat) -> Self {
         Self { client }
     }
 
+    /// Fetches climate normals data for a specific weather station ID.
+    ///
+    /// # Arguments
+    ///
+    /// * `station` - The unique identifier string of the weather station (e.g., "10382").
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing a [`ClimateLazyFrame`] on success, allowing further
+    /// processing or collection of the data. Returns a [`MeteostatError`] if the
+    /// data cannot be fetched (e.g., network error, station data file not found, parsing error).
+    ///
+    /// # Errors
+    ///
+    /// Can return [`MeteostatError::WeatherData`] if fetching or parsing the underlying
+    /// data file fails.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use meteostat::{Meteostat, MeteostatError};
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), MeteostatError> {
+    /// let client = Meteostat::new().await?;
+    /// let station_id = "10382"; // Berlin-Tegel
+    ///
+    /// // Fetch climate normals for the specified station
+    /// let climate_lazy = client.climate().station(station_id).await?;
+    ///
+    /// // Collect the data into a DataFrame
+    /// let climate_df = climate_lazy.frame.collect()?;
+    /// println!("Climate normals for station {}:\n{}", station_id, climate_df);
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn station(&self, station: &str) -> Result<ClimateLazyFrame, MeteostatError> {
+        // Internal call to the main client's data fetching logic for a specific station
         let frame = self
             .client
             .data_from_station()
             .station(station)
-            .frequency(Frequency::Climate)
-            .call()
+            .frequency(Frequency::Climate) // Specify we want climate data
+            .call() // Execute the internal builder
             .await?;
+        // Wrap the resulting LazyFrame in the specific ClimateLazyFrame type
         Ok(ClimateLazyFrame::new(frame))
     }
 
-    #[builder(start_fn = location)]
-    #[doc(hidden)]
+    /// Initiates a request to fetch climate normals data for the nearest suitable station to a given location.
+    ///
+    /// This method starts a builder pattern. You must provide the location.
+    /// You can optionally specify:
+    /// *   `.max_distance_km(f64)`: Maximum search radius (default: 50.0 km).
+    /// *   `.station_limit(usize)`: Max number of candidate stations to *consider* (default: 1). Note: It will still only return data for the *first* successful one found.
+    /// *   `.required_data(RequiredData)`: Filter candidate stations based on their reported data inventory (e.g., `RequiredData::Any`). By default, no inventory filter is applied specifically for climate data location searches beyond the implicit check during data fetching.
+    ///
+    /// Finally, call `.call().await` on the builder to execute the search and data fetch.
+    ///
+    /// # Arguments (Initial Builder Method)
+    ///
+    /// * `coordinate` - The [`LatLon`] representing the geographical point of interest.
+    ///
+    /// # Returns
+    ///
+    /// After calling `.call().await`, returns a `Result` containing a [`ClimateLazyFrame`]
+    /// for the nearest suitable station found, or a [`MeteostatError`] if no suitable station
+    /// is found within the radius or if data fetching fails for all candidates.
+    ///
+    /// # Errors
+    ///
+    /// Can return:
+    /// *   [`MeteostatError::NoStationWithinRadius`]: If the initial station search finds no candidates matching the criteria.
+    /// *   [`MeteostatError::NoDataFoundForNearbyStations`]: If candidate stations were found, but fetching climate data failed for all attempted stations.
+    /// *   [`MeteostatError::LocateStation`]: If the underlying station search mechanism fails.
+    /// *   [`MeteostatError::WeatherData`]: Encapsulated within `NoDataFoundForNearbyStations` if fetching fails for a candidate.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use meteostat::{Meteostat, MeteostatError, LatLon, RequiredData};
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), MeteostatError> {
+    /// let client = Meteostat::new().await?;
+    /// let berlin_center = LatLon(52.52, 13.40);
+    ///
+    /// // Fetch climate data for the location, searching up to 100km
+    /// // and considering up to 3 candidate stations if the first fails.
+    /// let climate_lazy = client
+    ///     .climate()
+    ///     .location(berlin_center) // Required: Start builder with location
+    ///     .max_distance_km(100.0)   // Optional: Set search radius
+    ///     .station_limit(3)         // Optional: Consider up to 3 stations
+    ///     // .required_data(RequiredData::Any) // Optional: Add inventory filter if needed
+    ///     .call()                   // Required: Execute the search & fetch
+    ///     .await?;                  // -> Result<ClimateLazyFrame, MeteostatError>
+    ///
+    /// let climate_df = climate_lazy.frame.collect()?;
+    /// println!("Climate data near {:?}:\n{}", berlin_center, climate_df);
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[builder(start_fn = location)] // Define 'location' as the entry point for the builder
+    #[doc(hidden)] // Hide the internal implementation detail `build_location` from docs
     pub async fn build_location(
         &self,
         #[builder(start_fn)] coordinate: LatLon,

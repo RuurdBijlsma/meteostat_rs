@@ -117,13 +117,9 @@ pub use meteostat::{InventoryRequest, LatLon, Meteostat};
 // --- Client Builders (Accessed via Meteostat methods) ---
 // These are the types returned by `meteostat.hourly()`, etc., before specifying source.
 // Users don't typically need to import them directly.
-#[doc(hidden)] // Hide the specific client types as users access them via Meteostat methods
 pub use clients::climate_client::*;
-#[doc(hidden)]
 pub use clients::daily_client::*;
-#[doc(hidden)]
 pub use clients::hourly_client::*;
-#[doc(hidden)]
 pub use clients::monthly_client::*;
 
 // --- Data Types & Enums ---
