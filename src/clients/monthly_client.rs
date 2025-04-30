@@ -176,7 +176,6 @@ mod tests {
             .frame
             .collect()?;
         assert!(data.height() > 0, "Expected some monthly data");
-        // dbg!(&data.head(Some(5)));
         Ok(())
     }
 
@@ -194,7 +193,6 @@ mod tests {
             data.height() > 0,
             "Expected some monthly data for Berlin area"
         );
-        // dbg!(&data.head(Some(5)));
         Ok(())
     }
 }

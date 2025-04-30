@@ -14,7 +14,7 @@ use std::collections::HashMap;
 /// This structure holds information retrieved from the Meteostat stations metadata,
 /// often corresponding to fields in their JSON format. It includes identification,
 /// geographical location, and data availability (inventory).
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Station {
     /// The unique Meteostat station identifier (e.g., "10637").
@@ -40,7 +40,7 @@ pub struct Station {
 /// Indicates the approximate start and end dates/years for which data is expected
 /// to be available according to Meteostat's metadata. Note that gaps might exist
 /// within these ranges.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct Inventory {
     /// The reported start and end dates for daily data.
     pub daily: DateRange,
@@ -57,7 +57,7 @@ pub struct Inventory {
 /// Represents a date range with optional start and end dates.
 ///
 /// Used within [`Inventory`] for frequencies where day-level precision is relevant (daily, hourly).
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct DateRange {
     /// The earliest date for which data is reported available, if known.
     pub start: Option<NaiveDate>,
@@ -68,7 +68,7 @@ pub struct DateRange {
 /// Represents a year range with optional start and end years.
 ///
 /// Used within [`Inventory`] for frequencies where year-level precision is sufficient (monthly, climate normals).
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct YearRange {
     /// The earliest year for which data is reported available, if known.
     pub start: Option<i32>,
@@ -77,7 +77,7 @@ pub struct YearRange {
 }
 
 /// Holds various alternative identifiers that might be associated with a weather station.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct Identifiers {
     /// National station identifier, if available.
     pub national: Option<String>,
@@ -88,7 +88,7 @@ pub struct Identifiers {
 }
 
 /// Represents the geographical location of a weather station.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Location {
     /// Latitude in decimal degrees (positive for North, negative for South).
     pub latitude: f64,

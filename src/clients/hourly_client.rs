@@ -185,7 +185,6 @@ mod tests {
             .frame
             .collect()?;
         assert!(data.height() > 0, "Expected some hourly data for 2023");
-        // dbg!(&data.head(Some(5))); // Optional: print head
         Ok(())
     }
 
@@ -202,7 +201,6 @@ mod tests {
             .collect()?;
         // get_at should return 0 or 1 row for hourly data
         assert!(data.height() <= 1, "Expected 0 or 1 row for specific hour");
-        // dbg!(&data);
         Ok(())
     }
 
@@ -222,7 +220,6 @@ mod tests {
             data.height() > 0,
             "Expected some hourly data for Berlin area in July 2023"
         );
-        // dbg!(&data.head(Some(5)));
         Ok(())
     }
 }

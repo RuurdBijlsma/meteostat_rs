@@ -1,8 +1,8 @@
 use crate::types::frequency::Frequency;
 use crate::weather_data::error::WeatherDataError;
 use async_compression::tokio::bufread::GzipDecoder;
+use chrono::{DateTime, Utc};
 use futures_util::TryStreamExt;
-use log::{debug, info, warn};
 use polars::frame::DataFrame;
 use polars::prelude::*;
 use reqwest::Client;
@@ -28,6 +28,54 @@ impl WeatherDataLoader {
         }
     }
 
+    /// Gets the last modification time of the cached Parquet file for a given
+    /// station and frequency.
+    ///
+    /// This function is cross-platform.
+    ///
+    /// # Arguments
+    ///
+    /// * `station` - The ID of the station.
+    /// * `frequency` - The data frequency.
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(Some(NaiveDateTime))` - If the cache file exists and its modification
+    ///   time could be determined (returned as UTC).
+    /// * `Ok(None)` - If the cache file does not exist.
+    /// * `Err(WeatherDataError)` - For I/O errors reading metadata.
+    pub async fn get_cache_modification_time(
+        &self,
+        station: &str,
+        frequency: Frequency,
+    ) -> Result<Option<DateTime<Utc>>, WeatherDataError> {
+        let cache_filename = format!("{}{}.parquet", frequency.cache_file_prefix(), station);
+        let parquet_path = self.cache_dir.join(&cache_filename);
+
+        match fs::metadata(&parquet_path).await {
+            Ok(metadata) => {
+                // File exists, try to get modification time
+                let modified_system_time = metadata
+                    .modified()
+                    .map_err(|e| WeatherDataError::CacheMetadataRead(parquet_path.clone(), e))?;
+
+                // Convert SystemTime to chrono::DateTime<Utc>
+                let modified_datetime_utc: DateTime<Utc> = DateTime::from(modified_system_time);
+
+                Ok(Some(modified_datetime_utc))
+            }
+            Err(io_err) => {
+                if io_err.kind() == std::io::ErrorKind::NotFound {
+                    // File doesn't exist, this is a normal cache miss scenario
+                    Ok(None)
+                } else {
+                    // Other error accessing metadata (permissions, etc.)
+                    Err(WeatherDataError::CacheMetadataRead(parquet_path, io_err))
+                }
+            }
+        }
+    }
+
     /// Generic function to load a DataFrame for a given station and data type.
     /// Handles caching and downloading. Returns a LazyFrame with schema-specific column names and types.
     pub async fn get_frame(
@@ -39,15 +87,7 @@ impl WeatherDataLoader {
         let parquet_path = self.cache_dir.join(&cache_filename);
 
         if fs::metadata(&parquet_path).await.is_ok() {
-            info!(
-                "Cache hit for {} data type for station {} at {:?}",
-                data_type, station, parquet_path
-            );
         } else {
-            warn!(
-                "Cache miss for {} data type for station {}. Downloading and processing.",
-                data_type, station
-            );
             let station_id = station.to_string();
 
             let raw_bytes = self.download(data_type, &station_id).await?;
@@ -59,10 +99,6 @@ impl WeatherDataLoader {
 
             // Pass df by value (ownership moves to cache_dataframe)
             Self::cache_dataframe(df, &parquet_path).await?;
-            info!(
-                "Cached {} data for station {} to {:?}",
-                data_type, station, parquet_path
-            );
         }
 
         LazyFrame::scan_parquet(&parquet_path, Default::default())
@@ -80,7 +116,6 @@ impl WeatherDataLoader {
             data_type.path_segment(),
             station
         );
-        info!("Downloading data from {}", url);
 
         let response = self
             .download_client
@@ -92,7 +127,6 @@ impl WeatherDataLoader {
         let response = match response.error_for_status() {
             Ok(resp) => resp,
             Err(e) => {
-                warn!("HTTP error for {}: {:?}", url, e); // Log error details
                 return Err(if let Some(status) = e.status() {
                     WeatherDataError::HttpStatus {
                         url,
@@ -116,11 +150,6 @@ impl WeatherDataLoader {
             .read_to_end(&mut decompressed)
             .await
             .map_err(WeatherDataError::DownloadIo)?;
-        info!(
-            "Successfully downloaded and decompressed {} bytes for station {}",
-            decompressed.len(),
-            station
-        );
         Ok(decompressed)
     }
 
@@ -139,10 +168,12 @@ impl WeatherDataLoader {
                 station: station_owned.clone(),
                 source: e,
             })?;
-            temp_file.write_all(&bytes).map_err(|e| WeatherDataError::CsvReadIo {
-                station: station_owned.clone(),
-                source: e,
-            })?;
+            temp_file
+                .write_all(&bytes)
+                .map_err(|e| WeatherDataError::CsvReadIo {
+                    station: station_owned.clone(),
+                    source: e,
+                })?;
             temp_file.flush().map_err(|e| WeatherDataError::CsvReadIo {
                 station: station_owned.clone(),
                 source: e,
@@ -164,7 +195,6 @@ impl WeatherDataLoader {
                 })?;
 
             if df.width() != schema_names.len() {
-                warn!("CSV column count ({}) does not match schema length ({}) for station {} and type {}", df.width(), schema_names.len(), station_owned, data_type);
                 return Err(WeatherDataError::SchemaMismatch {
                     station: station_owned,
                     data_type,
@@ -178,9 +208,6 @@ impl WeatherDataLoader {
                     station: station_owned.clone(),
                     source: e,
                 })?;
-
-            debug!("DataFrame columns renamed for station {}: {:?}", station_owned, df.get_column_names());
-
 
             // --- START Type Casting and Pre-computation ---
             let mut lazy_df = df.lazy();
@@ -199,11 +226,14 @@ impl WeatherDataLoader {
                     // Hourly logic remains the same...
                     lazy_df.with_columns([
                         // Create datetime first from string date and i64 hour
-                        (
-                            col("date").str().strptime(DataType::Date, date_options.clone(), lit("raise"))
-                                .cast(DataType::Datetime(TimeUnit::Milliseconds, None))
-                                + duration(DurationArgs::new().with_hours(col("hour").cast(DataType::Int64)))
-                        ).alias("datetime"),
+                        (col("date")
+                            .str()
+                            .strptime(DataType::Date, date_options.clone(), lit("raise"))
+                            .cast(DataType::Datetime(TimeUnit::Milliseconds, None))
+                            + duration(
+                                DurationArgs::new().with_hours(col("hour").cast(DataType::Int64)),
+                            ))
+                        .alias("datetime"),
                         // Cast numerical columns
                         col("date").cast(DataType::String),
                         col("hour").cast(DataType::Int64),
@@ -211,7 +241,7 @@ impl WeatherDataLoader {
                         col("dwpt").cast(DataType::Float64),
                         col("rhum").cast(DataType::Int64), // integer percentage
                         col("prcp").cast(DataType::Float64),
-                        col("snow").cast(DataType::Int64), 
+                        col("snow").cast(DataType::Int64),
                         col("wdir").cast(DataType::Int64), // Degrees
                         col("wspd").cast(DataType::Float64),
                         col("wpgt").cast(DataType::Float64),
@@ -219,12 +249,14 @@ impl WeatherDataLoader {
                         col("tsun").cast(DataType::Int64), // minutes
                         col("coco").cast(DataType::Int64), // Weather condition code
                     ])
-                },
+                }
                 Frequency::Daily => {
                     // Daily logic remains the same...
                     lazy_df.with_columns([
                         // Parse date string to Date type
-                        col("date").str().strptime(DataType::Date, date_options.clone(), lit("raise"))
+                        col("date")
+                            .str()
+                            .strptime(DataType::Date, date_options.clone(), lit("raise"))
                             .alias("date"), // Overwrite original string date column
                         // Cast numerical columns
                         col("tavg").cast(DataType::Float64),
@@ -238,7 +270,7 @@ impl WeatherDataLoader {
                         col("pres").cast(DataType::Float64),
                         col("tsun").cast(DataType::Int64),
                     ])
-                },
+                }
                 Frequency::Monthly => {
                     lazy_df.with_columns([
                         // Cast year and month first
@@ -253,7 +285,7 @@ impl WeatherDataLoader {
                         col("pres").cast(DataType::Float64),
                         col("tsun").cast(DataType::Int64),
                     ])
-                },
+                }
                 Frequency::Climate => {
                     // Climate logic remains the same...
                     lazy_df.with_columns([
@@ -269,22 +301,22 @@ impl WeatherDataLoader {
                         col("pres").cast(DataType::Float64),
                         col("tsun").cast(DataType::Int64),
                     ])
-                },
+                }
             };
 
             // Collect the lazy frame to apply transformations and handle potential errors
-            let typed_df = lazy_df.collect().map_err(|e| WeatherDataError::ColumnOperationError {
-                station: station_owned.clone(),
-                source: e,
-            })?;
-
-            info!("Successfully applied data types for {} data for station {}", data_type, station_owned);
-            debug!("Final schema for station {}: {:?}", station_owned, typed_df.schema());
+            let typed_df =
+                lazy_df
+                    .collect()
+                    .map_err(|e| WeatherDataError::ColumnOperationError {
+                        station: station_owned.clone(),
+                        source: e,
+                    })?;
 
             Ok(typed_df) // Return the transformed DataFrame
         })
-            .await? // Unwrap the JoinError
-                    // Propagate the inner Result<DataFrame, WeatherDataError>
+        .await? // Unwrap the JoinError
+                // Propagate the inner Result<DataFrame, WeatherDataError>
     }
 
     /// Writes a DataFrame to a Parquet file asynchronously using spawn_blocking.

@@ -47,6 +47,7 @@
 //!     let daily_lazy: DailyLazyFrame = client // Start with the main client
 //!         .daily()                 // Select the daily data client
 //!         .station(station_id)     // Specify station ID
+//!         .call()
 //!         .await?;                 // -> Result<DailyLazyFrame, MeteostatError>
 //!
 //!     // 4. Filter the data using methods on the frame wrapper

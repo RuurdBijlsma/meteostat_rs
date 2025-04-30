@@ -299,7 +299,7 @@ mod tests {
     // This station usually has extensive daily records.
     async fn get_test_daily_frame() -> Result<DailyLazyFrame, MeteostatError> {
         let client = Meteostat::new().await?;
-        client.daily().station("10384").await // Berlin Tempelhof
+        client.daily().station("10384").call().await // Berlin Tempelhof
     }
 
     #[tokio::test]

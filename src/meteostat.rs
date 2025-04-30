@@ -7,13 +7,13 @@
 use crate::stations::locate_station::{StationLocator, BINCODE_CACHE_FILE_NAME};
 use crate::utils::{ensure_cache_dir_exists, get_cache_dir};
 use crate::weather_data::frame_fetcher::FrameFetcher;
+use crate::RequiredData::Any;
 use crate::{
     ClimateClient, DailyClient, Frequency, HourlyClient, MeteostatError, MonthlyClient,
     RequiredData, Station,
 };
 use bon::bon;
 use polars::prelude::LazyFrame;
-use std::ffi::OsStr;
 use std::io;
 use std::path::PathBuf;
 
@@ -214,7 +214,7 @@ impl Meteostat {
     /// let paris = LatLon(48.85, 2.35);
     ///
     /// // Get daily data for station "07150" (Paris-Montsouris)
-    /// let daily_data = client.daily().station("07150").await?;
+    /// let daily_data = client.daily().station("07150").call().await?;
     /// # Ok(())
     /// # }
     /// ```
@@ -370,6 +370,7 @@ impl Meteostat {
     ///
     /// * `station` - The ID of the weather station.
     /// * `frequency` - The desired data [`Frequency`].
+    /// * `required_data` - (optional) Make sure cache isn't older than requested date.
     ///
     /// # Returns
     ///
@@ -385,9 +386,10 @@ impl Meteostat {
         &self,
         station: &str,
         frequency: Frequency,
+        required_data: Option<RequiredData>,
     ) -> Result<LazyFrame, MeteostatError> {
         self.fetcher
-            .get_cache_lazyframe(station, frequency)
+            .get_cache_lazyframe(station, frequency, required_data.unwrap_or(Any))
             .await
             .map_err(MeteostatError::from) // Converts WeatherDataError
     }
@@ -457,7 +459,7 @@ impl Meteostat {
         for (station, _) in stations.iter() {
             match self
                 .fetcher
-                .get_cache_lazyframe(&station.id, frequency)
+                .get_cache_lazyframe(&station.id, frequency, required_data.unwrap_or(Any))
                 .await
             {
                 Ok(lazy_frame) => {
@@ -605,14 +607,6 @@ impl Meteostat {
         station: &str,
         frequency: Frequency,
     ) -> Result<(), MeteostatError> {
-        let file =
-            self.cache_folder
-                .join(format!("{}-{}.parquet", frequency.path_segment(), station));
-        match tokio::fs::remove_file(&file).await {
-            Ok(_) => {}
-            Err(e) if e.kind() == io::ErrorKind::NotFound => {} // Not an error if already gone
-            Err(e) => return Err(MeteostatError::CacheDeletionError(file.clone(), e)),
-        }
         // Also clear from the in-memory FrameFetcher cache
         self.fetcher
             .clear_cache(station, frequency)
@@ -652,33 +646,6 @@ impl Meteostat {
     /// # }
     /// ```
     pub async fn clear_weather_data_cache(&self) -> Result<(), MeteostatError> {
-        let mut entries = tokio::fs::read_dir(&self.cache_folder)
-            .await
-            .map_err(|e| MeteostatError::CacheDeletionError(self.cache_folder.clone(), e))?;
-
-        while let Some(entry) = entries
-            .next_entry()
-            .await
-            .map_err(|e| MeteostatError::CacheDeletionError(self.cache_folder.clone(), e))?
-        {
-            let file_path = entry.path();
-            if file_path.is_file() {
-                if let Some(extension) = file_path.extension() {
-                    if extension == OsStr::new("parquet") {
-                        match tokio::fs::remove_file(&file_path).await {
-                            Ok(_) => {}
-                            Err(e) if e.kind() == io::ErrorKind::NotFound => {} // Ignore if already gone
-                            Err(e) => {
-                                return Err(MeteostatError::CacheDeletionError(
-                                    file_path.clone(),
-                                    e,
-                                ))
-                            }
-                        }
-                    }
-                }
-            }
-        }
         // Also clear the FrameFetcher's internal cache
         self.fetcher
             .clear_cache_all()
@@ -771,6 +738,7 @@ impl Meteostat {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::ffi::OsStr;
     use std::fs;
     use std::path::Path;
     use tempfile::tempdir;
@@ -814,7 +782,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_clear_weather_data_cache() -> Result<(), Box<dyn std::error::Error>> {
-        // Keep Box<dyn Error> for flexibility
         let temp_dir = tempdir()?;
         let cache_path = temp_dir.path().to_path_buf();
         let client = Meteostat::with_cache_folder(cache_path.clone()).await?;
