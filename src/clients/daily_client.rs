@@ -60,7 +60,7 @@ impl<'a> DailyClient<'a> {
     /// let station_id = "06240"; // Amsterdam Schiphol
     ///
     /// // Fetch daily data for the specified station
-    /// let daily_lazy = client.daily().station(station_id).await?;
+    /// let daily_lazy = client.daily().station(station_id).call().await?;
     ///
     /// // Filter for a specific year and collect
     /// let daily_2023_df = daily_lazy.get_for_period(Year(2023))?.frame.collect()?;
@@ -68,14 +68,21 @@ impl<'a> DailyClient<'a> {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn station(&self, station: &str) -> Result<DailyLazyFrame, MeteostatError> {
+    #[builder(start_fn = station)] // Define 'location' as the entry point for the builder
+    #[doc(hidden)] // Hide the internal implementation detail `build_location` from docs
+    pub async fn build_station(
+        &self,
+        #[builder(start_fn)] station: &str,
+        required_data: Option<RequiredData>,
+    ) -> Result<DailyLazyFrame, MeteostatError> {
         // Internal call to the main client's data fetching logic for a specific station
         let frame = self
             .client
             .data_from_station()
             .station(station)
-            .frequency(Frequency::Daily) // Specify we want daily data
-            .call() // Execute the internal builder
+            .maybe_required_data(required_data)
+            .frequency(Frequency::Daily)
+            .call()
             .await?;
         // Wrap the resulting LazyFrame in the specific DailyLazyFrame type
         Ok(DailyLazyFrame::new(frame))
@@ -176,6 +183,7 @@ mod tests {
         let data = client
             .daily()
             .station("06240") // Schiphol
+            .call()
             .await?
             .get_for_period(Year(2023))?
             .frame
@@ -190,6 +198,7 @@ mod tests {
         let data = client
             .daily()
             .station("06240") // Schiphol
+            .call()
             .await?
             .get_at(NaiveDate::from_ymd_opt(2023, 7, 15).unwrap())? // Use Day, Month, Year or NaiveDate
             .frame

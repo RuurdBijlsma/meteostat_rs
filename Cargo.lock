@@ -1748,7 +1748,6 @@ dependencies = [
  "dirs",
  "futures-util",
  "haversine",
- "log",
  "ordered-float",
  "plotlars",
  "polars",

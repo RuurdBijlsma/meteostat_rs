@@ -38,7 +38,6 @@ rstar = "0.12.2"
 dirs = "6.0.0"
 tempfile = "3.19.1"
 thiserror = "2.0.12"
-log = "0.4.27"
 bon = "3.6.3"
 ordered-float = "5.0.0"
 # Only for one of the examples:
