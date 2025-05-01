@@ -32,27 +32,51 @@ impl<'a> HourlyClient<'a> {
         Self { client }
     }
 
-    /// Fetches hourly weather data for a specific weather station ID.
+    /// Initiates a builder to fetch hourly weather data for a specific weather station ID.
     ///
-    /// # Arguments
+    /// This method sets the target station ID for the request.
+    /// You can optionally specify `.required_data(RequiredData)` to apply an inventory filter,
+    /// ensuring the station is suitable based on its reported data availability (e.g.,
+    /// requiring data for a specific year using `RequiredData::FullYear(2023)`).
     ///
-    /// * `station` - The unique identifier string of the weather station (e.g., "06240").
+    /// Finally, call `.call().await` on the resulting builder object to execute the
+    /// data fetch.
+    ///
+    /// # Arguments (Initial Builder Method)
+    ///
+    /// * `station` - The unique identifier string of the weather station (e.g., "06240")
+    ///   passed to the initial `.station()` call.
+    ///
+    /// # Optional Builder Methods
+    ///
+    /// * `.required_data(RequiredData)`: Filters the request based on the station's
+    ///   advertised data inventory. This is useful for ensuring the station is likely
+    ///   to have the hourly data you need (e.g., for a specific period) before attempting
+    ///   the potentially large download. For example, `RequiredData::FullYear(2023)` would check
+    ///   if the station inventory indicates hourly data for the full year 2023. If the filter
+    ///   isn't met, the fetch might fail early or return an error. Defaults to `None`
+    ///   (no inventory pre-filtering).
     ///
     /// # Returns
     ///
-    /// A `Result` containing an [`HourlyLazyFrame`] on success, allowing further
-    /// processing or collection of the data (e.g., filtering by datetime range). Returns a
-    /// [`MeteostatError`] if the data cannot be fetched.
+    /// After calling `.call().await`, returns a `Result` containing an [`HourlyLazyFrame`]
+    /// on success. This lazy frame holds all available hourly data for the station, which
+    /// can then be further filtered (e.g., by datetime range) or collected. Returns a
+    /// [`MeteostatError`] if the data cannot be fetched or if the `required_data`
+    /// filter is not met according to the station inventory.
     ///
     /// # Errors
     ///
-    /// Can return [`MeteostatError::WeatherData`] if fetching or parsing the underlying
-    /// data file fails (e.g., network error, file not found, CSV parse error).
+    /// Can return:
+    /// *   [`MeteostatError::WeatherData`]: If fetching or parsing the underlying data file fails
+    ///     (e.g., network error, file not found, CSV parse error).
+    /// *   Could also potentially return an error related to unmet `required_data` criteria
+    ///     if the inventory check fails before attempting the fetch (depends on internal logic).
     ///
     /// # Example
     ///
     /// ```no_run
-    /// # use meteostat::{Meteostat, MeteostatError};
+    /// # use meteostat::{Meteostat, MeteostatError, RequiredData};
     /// use chrono::{Utc, TimeZone};
     ///
     /// # #[tokio::main]
@@ -60,10 +84,15 @@ impl<'a> HourlyClient<'a> {
     /// let client = Meteostat::new().await?;
     /// let station_id = "06240"; // Amsterdam Schiphol
     ///
-    /// // Fetch hourly data for the specified station
-    /// let hourly_lazy = client.hourly().station(station_id).call().await?;
+    /// // Fetch hourly data for the specified station, maybe requiring inventory for 2023
+    /// let hourly_lazy = client
+    ///     .hourly()
+    ///     .station(station_id)            // Required: Start builder with station ID
+    ///     // .required_data(RequiredData::FullYear(2023)) // Optional: Filter by inventory
+    ///     .call()                         // Required: Execute the fetch
+    ///     .await?;                        // -> Result<HourlyLazyFrame, MeteostatError>
     ///
-    /// // Filter for a specific time range and collect
+    /// // Filter the result for a specific time range and collect
     /// let start_dt = Utc.with_ymd_and_hms(2023, 1, 1, 6, 0, 0).unwrap();
     /// let end_dt = Utc.with_ymd_and_hms(2023, 1, 1, 12, 0, 0).unwrap();
     /// let morning_df = hourly_lazy.get_range(start_dt, end_dt)?.frame.collect()?;
@@ -173,14 +202,14 @@ impl<'a> HourlyClient<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Month, Year};
+    use crate::{Month, RequiredData, Year}; // Ensure RequiredData is imported for tests
 
     // Helper to create a known location (Berlin Mitte)
     fn berlin_location() -> LatLon {
         LatLon(52.520008, 13.404954)
     }
 
-    // HOURLY (Existing tests are good, maybe add one for specific date)
+    // HOURLY
     #[tokio::test]
     async fn test_hourly_from_station_for_period() -> Result<(), MeteostatError> {
         let client = Meteostat::new().await?;
@@ -193,6 +222,27 @@ mod tests {
             .frame
             .collect()?;
         assert!(data.height() > 0, "Expected some hourly data for 2023");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_hourly_from_station_with_filter() -> Result<(), MeteostatError> {
+        let client = Meteostat::new().await?;
+        let data = client
+            .hourly()
+            .station("06240") // Schiphol
+            // Add filter, e.g., refresh cache if cache is older than end of 2023.
+            .required_data(RequiredData::FullYear(2023))
+            .call()
+            .await?
+            .get_for_period(Year(2023))?
+            .frame
+            .collect()?;
+        // Expect a significant number of hours if the inventory is correct and filter passes
+        assert!(
+            data.height() > 5000,
+            "Expected >5000 hours of data for 2023 after inventory filter"
+        );
         Ok(())
     }
 

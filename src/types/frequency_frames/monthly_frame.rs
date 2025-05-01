@@ -169,8 +169,8 @@ impl MonthlyLazyFrame {
 
         let start_year = start_month_obj.year();
         let end_year = end_month_obj.year();
-        let start_month_num = start_month_obj.month(); // u32
-        let end_month_num = end_month_obj.month(); // u32
+        let start_month_num = start_month_obj.month();
+        let end_month_num = end_month_obj.month();
 
         // Build the filter expression
         // Condition: (year > start_year) OR (year == start_year AND month >= start_month_num)
