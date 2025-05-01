@@ -40,7 +40,7 @@ struct Monthly {
 ///
 /// The initial creation via [`crate::Meteostat::monthly`] methods can return a [`MeteostatError`] if
 /// data fetching or station lookup fails.
-#[derive(Clone)] // Added Clone for convenience
+#[derive(Clone)]
 pub struct MonthlyLazyFrame {
     /// The underlying Polars LazyFrame containing the monthly data.
     pub frame: LazyFrame,
@@ -318,7 +318,7 @@ mod tests {
     // Helper to fetch monthly data for tests - uses Berlin Tempelhof ("10384")
     async fn get_test_monthly_frame() -> Result<MonthlyLazyFrame, MeteostatError> {
         let client = Meteostat::new().await?;
-        client.monthly().station("10384").await // Berlin Tempelhof
+        client.monthly().station("10384").call().await // Berlin Tempelhof
     }
 
     #[tokio::test]

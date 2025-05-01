@@ -63,7 +63,6 @@ impl StationLocator {
             stations = tokio::task::spawn_blocking(move || Self::get_cached_stations(&path_clone))
                 .await??;
         } else {
-            println!("Cache file not found. Fetching from URL: {}", DATA_URL);
             stations = Self::fetch_stations().await?;
             Self::cache_stations(stations.clone(), &cache_file).await?;
         }
@@ -84,7 +83,6 @@ impl StationLocator {
     }
 
     async fn fetch_stations() -> Result<Vec<Station>, LocateStationError> {
-        // ... implementation unchanged ...
         let client = Client::new();
         let response = client
             .get(DATA_URL)
@@ -113,18 +111,11 @@ impl StationLocator {
         let mut decoder_reader = BufReader::new(gzip_decoder);
         let mut decompressed_json = Vec::with_capacity(20_000_000);
         decoder_reader.read_to_end(&mut decompressed_json).await?;
-        // println!("Downloaded and decompressed data ({} bytes)", decompressed_json.len()); // Reduce noise
-        let parse_start = std::time::Instant::now();
         let stations = tokio::task::spawn_blocking(move || {
             serde_json::from_slice::<Vec<Station>>(&decompressed_json)
                 .map_err(LocateStationError::from)
         })
         .await??;
-        println!(
-            "Parsed {} stations from JSON in {:?}",
-            stations.len(),
-            parse_start.elapsed()
-        );
         Ok(stations)
     }
 
@@ -132,8 +123,6 @@ impl StationLocator {
         stations: Vec<Station>,
         cache_path: &Path,
     ) -> Result<(), LocateStationError> {
-        // ... implementation unchanged ...
-        let cache_start = std::time::Instant::now();
         let bincode_data = tokio::task::spawn_blocking({
             move || {
                 bincode::serde::encode_to_vec(stations, BINCODE_CONFIG)
@@ -144,12 +133,6 @@ impl StationLocator {
         tokio::fs::write(&cache_path, &bincode_data)
             .await
             .map_err(|e| LocateStationError::CacheWrite(cache_path.to_path_buf(), e))?;
-        println!(
-            "Serialized and wrote cache ({} bytes) to {} in {:?}",
-            bincode_data.len(),
-            cache_path.display(),
-            cache_start.elapsed()
-        );
         Ok(())
     }
 
@@ -328,7 +311,6 @@ impl StationLocator {
             // assume we are unlikely to find a better candidate later.
             // This is the key performance optimization for filtered queries.
             if items_checked >= iteration_limit && heap.len() == n_results {
-                // println!("DEBUG: Filtered query early exit after {} items checked (limit {})", items_checked, iteration_limit); // Optional debug noise
                 break;
             }
         } // End R-tree iteration

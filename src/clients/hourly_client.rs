@@ -61,7 +61,7 @@ impl<'a> HourlyClient<'a> {
     /// let station_id = "06240"; // Amsterdam Schiphol
     ///
     /// // Fetch hourly data for the specified station
-    /// let hourly_lazy = client.hourly().station(station_id).await?;
+    /// let hourly_lazy = client.hourly().station(station_id).call().await?;
     ///
     /// // Filter for a specific time range and collect
     /// let start_dt = Utc.with_ymd_and_hms(2023, 1, 1, 6, 0, 0).unwrap();
@@ -72,11 +72,18 @@ impl<'a> HourlyClient<'a> {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn station(&self, station: &str) -> Result<HourlyLazyFrame, MeteostatError> {
+    #[builder(start_fn = station)]
+    #[doc(hidden)]
+    pub async fn build_station(
+        &self,
+        #[builder(start_fn)] station: &str,
+        required_data: Option<RequiredData>,
+    ) -> Result<HourlyLazyFrame, MeteostatError> {
         let frame = self
             .client
             .data_from_station()
             .station(station)
+            .maybe_required_data(required_data)
             .frequency(Frequency::Hourly)
             .call()
             .await?;
@@ -180,6 +187,7 @@ mod tests {
         let data = client
             .hourly()
             .station("06240") // Schiphol
+            .call()
             .await?
             .get_for_period(Year(2023))?
             .frame
@@ -194,6 +202,7 @@ mod tests {
         let data = client
             .hourly()
             .station("06240") // Schiphol
+            .call()
             .await?
             // Use a type that implements AnyDateTime, like chrono::DateTime<Utc>
             .get_at(chrono::DateTime::parse_from_rfc3339("2023-07-15T12:00:00Z").unwrap())?

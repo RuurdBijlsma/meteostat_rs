@@ -43,7 +43,7 @@ struct Daily {
 ///
 /// The initial creation via [`crate::Meteostat::daily`] methods can return a [`MeteostatError`] if
 /// data fetching or station lookup fails.
-#[derive(Clone)] // Added Clone for convenience
+#[derive(Clone)]
 pub struct DailyLazyFrame {
     /// The underlying Polars LazyFrame containing the daily data.
     pub frame: LazyFrame,

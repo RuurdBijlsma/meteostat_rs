@@ -60,7 +60,7 @@ impl<'a> ClimateClient<'a> {
     /// let station_id = "10382"; // Berlin-Tegel
     ///
     /// // Fetch climate normals for the specified station
-    /// let climate_lazy = client.climate().station(station_id).await?;
+    /// let climate_lazy = client.climate().station(station_id).call().await?;
     ///
     /// // Collect the data into a DataFrame
     /// let climate_df = climate_lazy.frame.collect()?;
@@ -68,12 +68,19 @@ impl<'a> ClimateClient<'a> {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn station(&self, station: &str) -> Result<ClimateLazyFrame, MeteostatError> {
+    #[builder(start_fn = station)]
+    #[doc(hidden)]
+    pub async fn build_station(
+        &self,
+        #[builder(start_fn)] station: &str,
+        required_data: Option<RequiredData>,
+    ) -> Result<ClimateLazyFrame, MeteostatError> {
         // Internal call to the main client's data fetching logic for a specific station
         let frame = self
             .client
             .data_from_station()
             .station(station)
+            .maybe_required_data(required_data)
             .frequency(Frequency::Climate) // Specify we want climate data
             .call() // Execute the internal builder
             .await?;
@@ -173,7 +180,13 @@ mod tests {
         let client = Meteostat::new().await?;
         // Climate normals station (e.g., Berlin-Tegel if available)
         // Using 10382 as an example which often has normals
-        let data = client.climate().station("10382").await?.frame.collect()?;
+        let data = client
+            .climate()
+            .station("10382")
+            .call()
+            .await?
+            .frame
+            .collect()?;
         assert!(!data.is_empty());
         Ok(())
     }

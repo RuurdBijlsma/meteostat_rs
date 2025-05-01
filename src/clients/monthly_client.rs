@@ -59,7 +59,7 @@ impl<'a> MonthlyClient<'a> {
     /// let station_id = "06240"; // Amsterdam Schiphol
     ///
     /// // Fetch monthly data for the specified station
-    /// let monthly_lazy = client.monthly().station(station_id).await?;
+    /// let monthly_lazy = client.monthly().station(station_id).call().await?;
     ///
     /// // Filter for a specific month (e.g., July 2023) and collect
     /// let july_2023_df = monthly_lazy.get_at(Month::new(7, 2023))?.frame.collect()?;
@@ -67,11 +67,18 @@ impl<'a> MonthlyClient<'a> {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn station(&self, station: &str) -> Result<MonthlyLazyFrame, MeteostatError> {
+    #[builder(start_fn = station)]
+    #[doc(hidden)]
+    pub async fn build_station(
+        &self,
+        #[builder(start_fn)] station: &str,
+        required_data: Option<RequiredData>,
+    ) -> Result<MonthlyLazyFrame, MeteostatError> {
         let frame = self
             .client
             .data_from_station()
             .station(station)
+            .maybe_required_data(required_data)
             .frequency(Frequency::Monthly)
             .call()
             .await?;
@@ -170,6 +177,7 @@ mod tests {
         let data = client
             .monthly()
             .station("06240") // Schiphol
+            .call()
             .await?
             // Monthly data often doesn't have per-period filters in the same way,
             // just collect the whole frame for the test.

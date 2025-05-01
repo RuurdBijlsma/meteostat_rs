@@ -4,10 +4,10 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum LocateStationError {
     #[error("Failed to determine cache directory")]
-    CacheDirResolution(#[source] std::io::Error), // Assuming utils return io::Error
+    CacheDirResolution(#[source] std::io::Error),
 
     #[error("Failed to create cache directory '{0}'")]
-    CacheDirCreation(PathBuf, #[source] std::io::Error), // Assuming utils return io::Error
+    CacheDirCreation(PathBuf, #[source] std::io::Error),
 
     #[error("Failed to read cache file '{0}'")]
     CacheRead(PathBuf, #[source] std::io::Error),
@@ -15,7 +15,6 @@ pub enum LocateStationError {
     #[error("Failed to write cache file '{0}'")]
     CacheWrite(PathBuf, #[source] std::io::Error),
 
-    // Note: Using Box for bincode errors as recommended by bincode documentation
     #[error("Failed to decode cache data from '{0}'")]
     CacheDecode(PathBuf, #[source] Box<bincode::error::DecodeError>),
 
@@ -30,7 +29,7 @@ pub enum LocateStationError {
         url: String,
         status: reqwest::StatusCode,
         #[source]
-        source: reqwest::Error, // Keep original error for details
+        source: reqwest::Error,
     },
 
     // Covers errors during download stream processing and decompression

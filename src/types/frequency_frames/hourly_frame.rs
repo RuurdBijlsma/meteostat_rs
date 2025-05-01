@@ -52,7 +52,7 @@ struct Hourly {
 ///
 /// The initial creation via [`crate::Meteostat::hourly`] methods can return a [`MeteostatError`] if
 /// data fetching or station lookup fails.
-#[derive(Clone)] // Added Clone for convenience
+#[derive(Clone)]
 pub struct HourlyLazyFrame {
     /// The underlying Polars LazyFrame containing the hourly data.
     pub frame: LazyFrame,
@@ -340,7 +340,7 @@ mod tests {
     // This station often has good hourly coverage. Berlin Tempelhof ("10384") also works.
     async fn get_test_hourly_frame() -> Result<HourlyLazyFrame, MeteostatError> {
         let client = Meteostat::new().await?;
-        client.hourly().station("07147").await // Paris Orly Airport
+        client.hourly().station("07147").call().await // Paris Orly Airport
     }
 
     fn ms_to_datetime(ms: i64) -> NaiveDateTime {
