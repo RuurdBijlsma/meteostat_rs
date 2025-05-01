@@ -3,9 +3,7 @@
 //! Contains the `ClimateLazyFrame` structure for handling lazy operations on Meteostat climate data.
 
 use crate::Year;
-// Added Meteostat and MeteostatError for tests
 use polars::prelude::{col, lit, Expr, LazyFrame};
-// Added IntoLazy, PolarsError for tests/docs
 
 /// Represents a row of climate normals data.
 /// (Note: This struct is currently not directly used in the lazy frame processing pipeline,
@@ -173,7 +171,7 @@ mod tests {
     // Uses a station known to often have climate normals (Berlin Tempelhof)
     async fn get_test_climate_frame() -> Result<ClimateLazyFrame, MeteostatError> {
         let client = Meteostat::new().await?;
-        client.climate().station("10384").await // Berlin Tempelhof
+        client.climate().station("10384").call().await // Berlin Tempelhof
     }
 
     #[tokio::test]

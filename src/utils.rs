@@ -18,7 +18,6 @@ pub async fn ensure_cache_dir_exists(path: &Path) -> Result<(), io::Error> {
             Ok(())
         }
         Err(e) if e.kind() == io::ErrorKind::NotFound => {
-            println!("Creating cache directory: {}", path.display());
             tokio::fs::create_dir_all(path).await?;
             Ok(())
         }

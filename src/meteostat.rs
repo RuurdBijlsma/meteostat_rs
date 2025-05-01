@@ -267,7 +267,7 @@ impl Meteostat {
     /// let client = Meteostat::new().await?;
     ///
     /// // Get climate normals for station "10382" (Berlin-Tegel)
-    /// let climate_data = client.climate().station("10382").await?;
+    /// let climate_data = client.climate().station("10382").call().await?;
     /// # Ok(())
     /// # }
     /// ```
@@ -594,7 +594,7 @@ impl Meteostat {
     /// let station_id = "10382"; // Example: Berlin-Tegel
     ///
     /// // Fetch some data first to ensure it's cached
-    /// let _ = client.hourly().station(station_id).await?;
+    /// let _ = client.hourly().station(station_id).call().await?;
     ///
     /// // Clear only the hourly cache for this station
     /// client.clear_weather_data_cache_per_station(station_id, Frequency::Hourly).await?;
@@ -764,7 +764,7 @@ mod tests {
         let berlin = berlin_location();
         let stations = client.find_stations().location(berlin).call().await?;
         let station_id = &stations[0].id;
-        let _lf = client.hourly().station(station_id).await?;
+        let _lf = client.hourly().station(station_id).call().await?;
         println!("Found station ID: {}", station_id);
         assert!(cache_file_exists(&cache_path, station_id, Frequency::Hourly).await);
 
@@ -1010,12 +1010,6 @@ mod tests {
         let err = result.err().unwrap();
         println!("Expected error: {:?}", err); // See the error details
 
-        // Use matches macro if added to dev-dependencies:
-        // use matches::assert_matches;
-        // assert_matches!(err, MeteostatError::NoStationWithinRadius { radius, lat, lon }
-        //     if radius == small_radius && lat == location.0 && lon == location.1
-        // );
-
         // Manual check without `matches` macro:
         match err {
             MeteostatError::NoStationWithinRadius { radius, lat, lon } => {
@@ -1095,6 +1089,7 @@ mod tests {
         let result = client
             .hourly() // Any frequency
             .station(invalid_station_id)
+            .call()
             .await; // Directly call on the client returned by .station()
 
         // This should ideally result in an error related to fetching/finding data for that ID.

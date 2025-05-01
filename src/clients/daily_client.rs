@@ -68,8 +68,8 @@ impl<'a> DailyClient<'a> {
     /// # Ok(())
     /// # }
     /// ```
-    #[builder(start_fn = station)] // Define 'location' as the entry point for the builder
-    #[doc(hidden)] // Hide the internal implementation detail `build_location` from docs
+    #[builder(start_fn = station)]
+    #[doc(hidden)]
     pub async fn build_station(
         &self,
         #[builder(start_fn)] station: &str,

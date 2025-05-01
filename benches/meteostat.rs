@@ -24,6 +24,7 @@ fn bench(c: &mut Criterion) {
                 let _ = meteostat
                     .hourly()
                     .station(black_box(station_str))
+                    .call()
                     .await
                     .unwrap();
             });
