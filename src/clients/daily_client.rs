@@ -232,10 +232,12 @@ mod tests {
             .get_for_period(Year(2023))? // Still filter the result frame
             .frame
             .collect()?;
-        assert!(data.height() > 300, "Expected >300 days of data for 2023 after inventory filter");
+        assert!(
+            data.height() > 300,
+            "Expected >300 days of data for 2023 after inventory filter"
+        );
         Ok(())
     }
-
 
     #[tokio::test]
     async fn test_daily_from_station_at_specific_date() -> Result<(), MeteostatError> {

@@ -225,7 +225,10 @@ mod tests {
             .await?
             .frame
             .collect()?;
-        assert!(!data.is_empty(), "Expected climate data even with RequiredData filter");
+        assert!(
+            !data.is_empty(),
+            "Expected climate data even with RequiredData filter"
+        );
         Ok(())
     }
 
