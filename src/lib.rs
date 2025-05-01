@@ -141,10 +141,10 @@ pub use types::traits::types::{Month, Year};
 
 // --- LazyFrame Wrapper Exports ---
 // These are the types returned *after* fetching data (e.g., from `client.daily().station().await?`)
-pub use types::frequency_frames::climate_frame::ClimateLazyFrame;
-pub use types::frequency_frames::daily_frame::DailyLazyFrame;
-pub use types::frequency_frames::hourly_frame::HourlyLazyFrame;
-pub use types::frequency_frames::monthly_frame::MonthlyLazyFrame;
+pub use types::frequency_frames::climate_frame::*;
+pub use types::frequency_frames::daily_frame::*;
+pub use types::frequency_frames::hourly_frame::*;
+pub use types::frequency_frames::monthly_frame::*;
 
 // --- Sub-Error Type Exports (useful for specific error matching) ---
 pub use stations::error::LocateStationError;

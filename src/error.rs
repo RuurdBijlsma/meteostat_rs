@@ -53,4 +53,7 @@ pub enum MeteostatError {
 
     #[error("Cannot get single climate row from just one date.")]
     ClimateSingleDateError,
+
+    #[error("Expected a single row DataFrame, but found {actual} rows.")]
+    ExpectedSingleRow { actual: usize },
 }
