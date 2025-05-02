@@ -1,4 +1,4 @@
-use meteostat::{LatLon, Meteostat, MeteostatError, Year};
+use meteostat::{LatLon, Meteostat, MeteostatError};
 use std::env;
 
 #[tokio::main]
@@ -12,7 +12,6 @@ async fn main() -> Result<(), MeteostatError> {
         .max_distance_km(50.0)
         .call()
         .await?
-        .get_for_period(Year(2023))?
         .frame
         .collect()?;
 

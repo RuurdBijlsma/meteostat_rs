@@ -33,34 +33,56 @@ impl<'a> ClimateClient<'a> {
         Self { client }
     }
 
-    /// Fetches climate normals data for a specific weather station ID.
+    /// Initiates a builder to fetch climate normals data for a specific weather station ID.
     ///
-    /// # Arguments
+    /// This method sets the target station ID for the request.
+    /// You can optionally specify `.required_data(RequiredData)` to apply an inventory filter
+    /// (though less common for direct station ID climate lookups).
     ///
-    /// * `station` - The unique identifier string of the weather station (e.g., "10382").
+    /// Finally, call `.call().await` on the resulting builder object to execute the
+    /// data fetch.
+    ///
+    /// # Arguments (Initial Builder Method)
+    ///
+    /// * `station` - The unique identifier string of the weather station (e.g., "10382")
+    ///   passed to the initial `.station()` call.
+    ///
+    /// # Optional Builder Methods
+    ///
+    /// * `.required_data(RequiredData)`: Filters the request based on the station's
+    ///   advertised data inventory. If the station doesn't meet the criteria according
+    ///   to the inventory (even if the data *might* exist), the fetch might fail early
+    ///   or return an error depending on the internal implementation. Defaults to `None`
+    ///   (no specific inventory requirement beyond needing climate data).
     ///
     /// # Returns
     ///
-    /// A `Result` containing a [`ClimateLazyFrame`] on success, allowing further
-    /// processing or collection of the data. Returns a [`MeteostatError`] if the
-    /// data cannot be fetched (e.g., network error, station data file not found, parsing error).
+    /// After calling `.call().await`, returns a `Result` containing a [`ClimateLazyFrame`]
+    /// on success, allowing further processing or collection of the data. Returns a
+    /// [`MeteostatError`] if the data cannot be fetched (e.g., network error,
+    /// station data file not found, parsing error, or unmet `required_data` filter).
     ///
     /// # Errors
     ///
     /// Can return [`MeteostatError::WeatherData`] if fetching or parsing the underlying
-    /// data file fails.
+    /// data file fails, potentially influenced by the `required_data` filter if set.
     ///
     /// # Example
     ///
     /// ```no_run
-    /// # use meteostat::{Meteostat, MeteostatError};
+    /// # use meteostat::{Meteostat, MeteostatError, RequiredData};
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), MeteostatError> {
     /// let client = Meteostat::new().await?;
     /// let station_id = "10382"; // Berlin-Tegel
     ///
     /// // Fetch climate normals for the specified station
-    /// let climate_lazy = client.climate().station(station_id).call().await?;
+    /// let climate_lazy = client
+    ///     .climate()
+    ///     .station(station_id) // Required: Start builder with station ID
+    ///     // .required_data(RequiredData::Any) // Optional: Add inventory filter if needed
+    ///     .call()              // Required: Execute the fetch
+    ///     .await?;             // -> Result<ClimateLazyFrame, MeteostatError>
     ///
     /// // Collect the data into a DataFrame
     /// let climate_df = climate_lazy.frame.collect()?;
@@ -188,6 +210,25 @@ mod tests {
             .frame
             .collect()?;
         assert!(!data.is_empty());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_climate_from_station_with_filter() -> Result<(), MeteostatError> {
+        let client = Meteostat::new().await?;
+        // Using a station known to exist and likely have climate data
+        let data = client
+            .climate()
+            .station("10382") // Berlin-Tegel
+            .required_data(RequiredData::FullYear(2023))
+            .call()
+            .await?
+            .frame
+            .collect()?;
+        assert!(
+            !data.is_empty(),
+            "Expected climate data even with RequiredData filter"
+        );
         Ok(())
     }
 

@@ -20,15 +20,25 @@ fetching data for thousands of weather stations worldwide.
 
 Take a look at yesterday's temperatures or discover the weather hundreds of years ago, right from your Rust application.
 
-## Key Features
+## Features
 
-*   **Fetch by Station ID or Location:** Initiate requests via frequency-specific clients (`client.hourly()`, `client.daily()`, etc.) and then specify either `.station("ID")` or `.location(LatLon)`.
-*   **Find Nearby Stations:** Search for stations near coordinates using `client.find_stations()`, optionally filtering by distance and required data availability (inventory).
-*   **Multiple Frequencies:** Supports [**Hourly**](https://dev.meteostat.net/bulk/hourly.html#endpoints), [**Daily**](https://dev.meteostat.net/bulk/daily.html), [**Monthly**](https://dev.meteostat.net/bulk/monthly.html), and [**Climate Normals**](https://dev.meteostat.net/bulk/normals.html) data.
-*   **Efficient Data Handling:** Returns data as wrappers around [Polars](https://pola.rs/) **`LazyFrame`s** (e.g., `HourlyLazyFrame`), allowing for powerful, memory-efficient filtering and manipulation *before* collecting results.
-*   **Convenient Filtering:** Frame wrappers provide methods for easy filtering by date, year, month, or datetime ranges (e.g., `daily_lazy.get_for_period(Year(2023))`).
-*   **Automatic Caching:** Downloads and caches station metadata and weather data files locally to speed up subsequent requests and reduce load on Meteostat's servers.
-*   **Asynchronous:** Built with `tokio` for non-blocking I/O.
+* **Fetch by Station ID or Location:** Initiate requests via frequency-specific clients (`client.hourly()`,
+  `client.daily()`, etc.) and then specify either `.station("ID")` or `.location(LatLon)`.
+* **Find Nearby Stations:** Search for stations near coordinates using `client.find_stations()`, optionally filtering by
+  distance and required data availability (inventory).
+* **Multiple Frequencies:** Supports [**Hourly**](https://dev.meteostat.net/bulk/hourly.html#endpoints), [**Daily
+  **](https://dev.meteostat.net/bulk/daily.html), [**Monthly**](https://dev.meteostat.net/bulk/monthly.html), and [*
+  *Climate Normals**](https://dev.meteostat.net/bulk/normals.html) data.
+* **Efficient Data Handling:** Returns data as wrappers around [Polars](https://pola.rs/) **`LazyFrame`s** (e.g.,
+  `HourlyLazyFrame`), allowing for powerful, memory-efficient filtering and manipulation *before* collecting results.
+* **Convenient Filtering:** Frame wrappers provide methods for easy filtering by date, year, month, or datetime ranges (
+  e.g., `daily_lazy.get_for_period(Year(2023))`).
+* **Collect to Structs:** Frame wrappers also offer direct collection methods (e.g., `hourly_lazy.collect_hourly()`,
+  `daily_lazy.collect_single_daily()`) to get results as `Vec<Struct>` or a single `Struct` (like `Hourly`, `Daily`),
+  handling the conversion from Polars types.
+* **Automatic Caching:** Downloads and caches station metadata and weather data files locally to speed up subsequent
+  requests and reduce load on Meteostat's servers.
+* **Asynchronous:** Built with `tokio` for non-blocking I/O.
 
 ## Installation
 
@@ -63,14 +73,17 @@ async fn main() -> Result<(), MeteostatError> {
     // Filter the HourlyLazyFrame for a specific time range
     let start_datetime = Utc.with_ymd_and_hms(2022, 1, 10, 0, 0, 0).unwrap(); // Jan 10 2022 00:00 UTC
     let end_datetime = Utc.with_ymd_and_hms(2022, 1, 10, 5, 59, 59).unwrap(); // Jan 10 2022 05:59 UTC
-    let specific_hours = hourly_lazy
-        .get_range(start_datetime, end_datetime)? // Use range filter on HourlyLazyFrame
+    let specific_hours_lazy = hourly_lazy
+        .get_range(start_datetime, end_datetime)?; // Use range filter on HourlyLazyFrame
+
+    // Collect the results into a Polars DataFrame
+    let specific_hours_df = specific_hours_lazy
         .frame // Access the underlying Polars LazyFrame
         .collect()?; // Collect the results
 
     println!(
         "Hourly data near Berlin for 2022-01-10 00:00-05:59:\n{}",
-        specific_hours.head(Some(6)) // Show up to 6 hours
+        specific_hours_df.head(Some(6)) // Show up to 6 hours
     );
 
 
@@ -79,11 +92,14 @@ async fn main() -> Result<(), MeteostatError> {
     let daily_lazy = client                   // Start with the main client
         .daily()                  // Select the daily data client
         .station(station_id)      // Specify station ID
-        .await?;                  // -> Result<DailyLazyFrame, MeteostatError>
+        .await?;                  // -> DailyLazyFrame
 
     // Filter the DailyLazyFrame for a specific year
-    let daily_2023 = daily_lazy
-        .get_for_period(Year(2023))? // Use period filter on DailyLazyFrame
+    let daily_2023_lazy = daily_lazy
+        .get_for_period(Year(2023))?; // Use period filter on DailyLazyFrame
+
+    // Collect the results into a Polars DataFrame
+    let daily_2023_df = daily_2023_lazy
         .frame // Access the underlying Polars LazyFrame
         .collect()?;
 
@@ -91,7 +107,7 @@ async fn main() -> Result<(), MeteostatError> {
         "\nDaily data for Station {} in {}:\n{}",
         station_id,
         2023,
-        daily_2023.head(Some(5))
+        daily_2023_df.head(Some(5))
     );
 
     Ok(())
@@ -109,26 +125,26 @@ use meteostat::{Meteostat, MeteostatError, LatLon, InventoryRequest, Frequency, 
 
 #[tokio::main]
 async fn main() -> Result<(), MeteostatError> {
-  let client = Meteostat::new().await?;
-  let nyc = LatLon(40.7128, -74.0060);
-  
-  // Find the 3 closest stations within 100km of NYC
-  // that have reported *any* Daily data.
-  let inventory_req = InventoryRequest::new(Frequency::Daily, RequiredData::Any);
-  
-  let stations = client.find_stations() // Direct method on Meteostat client
-      .location(nyc)
-      .max_distance_km(100.0)
-      .station_limit(3)
-      .inventory_request(inventory_req)
-      .call()
-      .await?;
-  
-  println!("Found {} stations near NYC matching criteria:", stations.len());
-  for station in stations {
-      println!("  - ID: {}, Name: {:?}", station.id, station.name.get("en"));
-  }
-  Ok(())
+    let client = Meteostat::new().await?;
+    let nyc = LatLon(40.7128, -74.0060);
+
+    // Find the 3 closest stations within 100km of NYC
+    // that have reported *any* Daily data.
+    let inventory_req = InventoryRequest::new(Frequency::Daily, RequiredData::Any);
+
+    let stations = client.find_stations()
+        .location(nyc)
+        .max_distance_km(100.0)
+        .station_limit(3)
+        .inventory_request(inventory_req)
+        .call()
+        .await?;
+
+    println!("Found {} stations near NYC matching criteria:", stations.len());
+    for station in stations {
+        println!("  - ID: {}, Name: {:?}", station.id, station.name.get("en"));
+    }
+    Ok(())
 }
 ```
 
@@ -136,33 +152,45 @@ async fn main() -> Result<(), MeteostatError> {
 
 ### Polars `LazyFrame` Wrappers
 
-All weather data fetching methods return a specific wrapper struct (e.g., `HourlyLazyFrame`, `DailyLazyFrame`) which contains a Polars `LazyFrame`. This allows you to:
+All weather data fetching methods return a specific wrapper struct (e.g., `HourlyLazyFrame`, `DailyLazyFrame`) which
+contains a Polars `LazyFrame`. This allows you to:
 
-1.  **Use convenience filters:** Apply common filters directly using methods on the wrapper (e.g., `daily_lazy.get_for_period(Year(2023))`).
-2.  **Access the underlying frame:** Get the `LazyFrame` via the `.frame` field for advanced Polars operations (joins, aggregations, complex selections, etc.).
-3.  **Optimize queries:** Polars optimizes the execution plan built from chained operations.
-4.  **Collect when ready:** Use `.frame.collect()?` on the wrapper to execute the plan and get a `DataFrame` in memory.
+1. **Use convenience filters:** Apply common filters directly using methods on the wrapper (e.g.,
+   `daily_lazy.get_for_period(Year(2023))`).
+2. **Access the underlying frame:** Get the `LazyFrame` via the `.frame` field for advanced Polars operations (joins,
+   aggregations, complex selections, etc.).
+3. **Optimize queries:** Polars optimizes the execution plan built from chained operations.
+4. **Collect to `DataFrame`:** Use `.frame.collect()?` on the wrapper to execute the plan and get a `DataFrame` in
+   memory for use with Polars or other tools.
+5. **Collect to Rust Structs:** Alternatively, use methods like `.collect_hourly()`, `.collect_daily()`,
+   `.collect_single_daily()`, etc., directly on the wrapper struct to get the results conveniently mapped into a
+   `Vec<Struct>` or a single `Struct` (e.g., `Vec<Hourly>`, `Daily`). This avoids needing to manually handle the
+   `DataFrame` conversion if you just need the data in native Rust types.
 
-This is particularly beneficial when dealing with potentially large historical datasets.
+This lazy approach is particularly beneficial when dealing with potentially large historical datasets.
 
 ### Caching
 
 The crate automatically caches downloaded data to avoid redundant downloads and respect Meteostat's resources:
 
-*   **Station Metadata:** The list of all stations (`stations/lite.json.gz`) is downloaded once and cached.
-*   **Weather Data:** Individual station data files (e.g., `hourly/10637.csv.gz`) are downloaded and cached per station and frequency.
+* **Station Metadata:** The list of all stations (`stations/lite.json.gz`) is downloaded once and cached.
+* **Weather Data:** Individual station data files (e.g., `hourly/10637.csv.gz`) are downloaded and cached per station
+  and frequency.
 
-By default, cache files are stored in your system's standard cache directory (e.g., `~/.cache/meteostat-rs` on Linux, `%LOCALAPPDATA%/meteostat_rs_cache` on Windows).
+By default, cache files are stored in your system's standard cache directory (e.g., `~/.cache/meteostat-rs` on Linux,
+`%LOCALAPPDATA%/meteostat_rs_cache` on Windows).
 You can specify a custom cache location using `Meteostat::with_cache_folder(path)`.
 
-## Filtering Data Frames
+## Filtering Data Frames and Collecting Results
 
-Each data frequency (`Hourly`, `Daily`, `Monthly`, `Climate`) has its own `LazyFrame` wrapper struct (`HourlyLazyFrame`, `DailyLazyFrame`, etc.) that provides convenient methods for common filtering tasks.
+Each data frequency (`Hourly`, `Daily`, `Monthly`, `Climate`) has its own `LazyFrame` wrapper struct (`HourlyLazyFrame`,
+`DailyLazyFrame`, etc.) that provides convenient methods for common filtering tasks. After filtering, you can collect
+the results either as a Polars `DataFrame` or directly into Rust structs.
 
 Access these wrappers by first selecting the frequency client and then fetching the data:
 
 ```rust
-use meteostat::{Meteostat, MeteostatError, Year, Month};
+use meteostat::{Meteostat, MeteostatError, Year, Month, Daily};
 use polars::prelude::*;
 use chrono::{NaiveDate, Utc, TimeZone};
 
@@ -171,59 +199,69 @@ async fn main() -> Result<(), MeteostatError> {
     let client = Meteostat::new().await?;
     let station_id = "10637"; // Schiphol
 
-    // --- Filter Daily Data by Year ---
+    // --- Filter Daily Data by Year and collect to DataFrame ---
     let daily_lazy = client.daily().station(station_id).await?;
     let daily_2022_lazy = daily_lazy.get_for_period(Year(2022))?;
     let daily_2022_df = daily_2022_lazy.frame.collect()?;
-    println!("Daily data for 2022:\n{}", daily_2022_df.head(Some(3)));
+    println!("Daily data for 2022 (DataFrame):\n{}", daily_2022_df.head(Some(3)));
 
-    // --- Filter Hourly Data by Datetime Range ---
+    // --- Filter Hourly Data by Datetime Range and collect to Vec<Hourly> ---
     let hourly_lazy = client.hourly().station(station_id).await?;
     let start_dt = Utc.with_ymd_and_hms(2023, 5, 1, 6, 0, 0).unwrap(); // May 1st 2023, 06:00 UTC
-    let end_dt = Utc.with_ymd_and_hms(2023, 5, 1, 12, 0, 0).unwrap(); // May 1st 2023, 12:00 UTC
+    let end_dt = Utc.with_ymd_and_hms(2023, 5, 1, 8, 0, 0).unwrap(); // May 1st 2023, 08:00 UTC
     let hourly_morning_lazy = hourly_lazy.get_range(start_dt, end_dt)?;
-    let hourly_morning_df = hourly_morning_lazy.frame.collect()?;
-    println!("\nHourly data for morning of 2023-05-01:\n{}", hourly_morning_df.head(Some(3)));
+    // Collect directly into Vec<Hourly>
+    let hourly_morning_vec = hourly_morning_lazy.collect_hourly()?;
+    println!("\nHourly data for morning of 2023-05-01 (Vec<Hourly>):");
+    for record in hourly_morning_vec.iter().take(3) {
+        println!("  {:?}", record);
+    }
 
-    // --- Get a Single Daily Row ---
+    // --- Get a Single Daily Row and collect to Daily struct ---
     let daily_lazy_again = client.daily().station(station_id).await?;
     let specific_date = NaiveDate::from_ymd_opt(2023, 10, 26).unwrap();
     let single_day_lazy = daily_lazy_again.get_at(specific_date)?;
-    let single_day_df = single_day_lazy.frame.collect()?;
-    println!("\nDaily data for {}:\n{}", specific_date, single_day_df);
+    // Collect directly into Option<Daily> (or Result<Daily, MeteostatError>)
+    match single_day_lazy.collect_single_daily() {
+        Ok(daily_record) => {
+            println!("\nDaily data for {} (Daily struct):\n  {:?}", specific_date, daily_record);
+        }
+        Err(MeteostatError::ExpectedSingleRow { actual: 0 }) => {
+            println!("\nNo daily data found for {}", specific_date);
+        }
+        Err(e) => return Err(e), // Other errors
+    }
 
-    // --- Get a Single Monthly Row ---
+
+    // --- Get a Single Monthly Row (using .frame.collect()) ---
     let monthly_lazy = client.monthly().station(station_id).await?;
     let specific_month = Month::new(7, 2023); // July 2023
     let single_month_lazy = monthly_lazy.get_at(specific_month)?;
-    let single_month_df = single_month_lazy.frame.collect()?;
-    println!("\nMonthly data for {:?}:\n{}", specific_month, single_month_df);
-
-    // --- Get Specific Climate Normals Row ---
-    let climate_lazy = client.climate().station(station_id).await?;
-    // Normals for July for the 1991-2020 period
-    let climate_row_lazy = climate_lazy.get_at(Year(1991), Year(2020), 7)?;
-    let climate_row_df = climate_row_lazy.frame.collect()?;
-    println!("\nClimate normals for July (1991-2020):\n{}", climate_row_df);
-
+    let single_month_df = single_month_lazy.frame.collect()?; // Collect to DF example
+    println!("\nMonthly data for {:?} (DataFrame):\n{}", specific_month, single_month_df);
 
     Ok(())
 }
 ```
 
-See the documentation for the specific frame wrappers for all available filtering methods:
+See the documentation for the specific frame wrappers for all available filtering and collection methods:
 
-*   [`HourlyLazyFrame`](https://docs.rs/meteostat/latest/meteostat/struct.HourlyLazyFrame.html)
-*   [`DailyLazyFrame`](https://docs.rs/meteostat/latest/meteostat/struct.DailyLazyFrame.html)
-*   [`MonthlyLazyFrame`](https://docs.rs/meteostat/latest/meteostat/struct.MonthlyLazyFrame.html)
-*   [`ClimateLazyFrame`](https://docs.rs/meteostat/latest/meteostat/struct.ClimateLazyFrame.html)
+* [`HourlyLazyFrame`](https://docs.rs/meteostat/latest/meteostat/struct.HourlyLazyFrame.html) (includes
+  `collect_hourly`, `collect_single_hourly`)
+* [`DailyLazyFrame`](https://docs.rs/meteostat/latest/meteostat/struct.DailyLazyFrame.html) (includes `collect_daily`,
+  `collect_single_daily`)
+* [`MonthlyLazyFrame`](https://docs.rs/meteostat/latest/meteostat/struct.MonthlyLazyFrame.html) (includes
+  `collect_monthly`, `collect_single_monthly`)
+* [`ClimateLazyFrame`](https://docs.rs/meteostat/latest/meteostat/struct.ClimateLazyFrame.html) (includes
+  `collect_climate`, `collect_single_climate`)
 
-For more complex filtering or analysis, access the underlying Polars `LazyFrame` via the `.frame` field on the wrapper structs.
+For more complex filtering or analysis *before* collection, access the underlying Polars `LazyFrame` via the `.frame`
+field on the wrapper structs.
 
 ## Data Source and Attribution
 
-*   All weather data is sourced from **[Meteostat](https://meteostat.net/)**.
-*   This crate uses Meteostat's **free bulk data interface**. No API key is required.
+* All weather data is sourced from **[Meteostat](https://meteostat.net/)**.
+* This crate uses Meteostat's **free bulk data interface**. No API key is required.
 
 ## API Documentation
 
@@ -246,6 +284,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let meteostat = Meteostat::new().await?;
     let location = LatLon(52.118641, 5.185589); // De Bilt, Netherlands
 
+    // Fetch and collect data into a DataFrame for plotting
     let weather_data: DataFrame = meteostat
         .daily() // Select daily client
         .location(location) // Specify location

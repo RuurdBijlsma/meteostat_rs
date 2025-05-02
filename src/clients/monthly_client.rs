@@ -32,36 +32,65 @@ impl<'a> MonthlyClient<'a> {
         Self { client }
     }
 
-    /// Fetches monthly weather data for a specific weather station ID.
+    /// Initiates a builder to fetch monthly weather data for a specific weather station ID.
     ///
-    /// # Arguments
+    /// This method sets the target station ID for the request.
+    /// You can optionally specify `.required_data(RequiredData)` to apply an inventory filter,
+    /// ensuring the station is suitable based on its reported data availability (e.g.,
+    /// requiring data for a specific year using `RequiredData::FullYear(2023)`).
     ///
-    /// * `station` - The unique identifier string of the weather station (e.g., "06240").
+    /// Finally, call `.call().await` on the resulting builder object to execute the
+    /// data fetch.
+    ///
+    /// # Arguments (Initial Builder Method)
+    ///
+    /// * `station` - The unique identifier string of the weather station (e.g., "06240")
+    ///   passed to the initial `.station()` call.
+    ///
+    /// # Optional Builder Methods
+    ///
+    /// * `.required_data(RequiredData)`: Filters the request based on the station's
+    ///   advertised data inventory. This is useful for ensuring the station is likely
+    ///   to have the monthly data you need (e.g., for a specific year) before attempting
+    ///   the download. For example, `RequiredData::FullYear(2023)` would check
+    ///   if the station inventory indicates monthly data for the full year 2023. If the filter
+    ///   isn't met, the fetch might fail early or return an error. Defaults to `None`
+    ///   (no inventory pre-filtering).
     ///
     /// # Returns
     ///
-    /// A `Result` containing a [`MonthlyLazyFrame`] on success, allowing further
-    /// processing or collection of the data (e.g., filtering by year/month). Returns a
-    /// [`MeteostatError`] if the data cannot be fetched.
+    /// After calling `.call().await`, returns a `Result` containing a [`MonthlyLazyFrame`]
+    /// on success. This lazy frame holds all available monthly data for the station, which
+    /// can then be further filtered (e.g., by year/month range) or collected. Returns a
+    /// [`MeteostatError`] if the data cannot be fetched or if the `required_data`
+    /// filter is not met according to the station inventory.
     ///
     /// # Errors
     ///
-    /// Can return [`MeteostatError::WeatherData`] if fetching or parsing the underlying
-    /// data file fails (e.g., network error, file not found, CSV parse error).
+    /// Can return:
+    /// *   [`MeteostatError::WeatherData`]: If fetching or parsing the underlying data file fails
+    ///     (e.g., network error, file not found, CSV parse error).
+    /// *   Could also potentially return an error related to unmet `required_data` criteria
+    ///     if the inventory check fails before attempting the fetch (depends on internal logic).
     ///
     /// # Example
     ///
     /// ```no_run
-    /// # use meteostat::{Meteostat, MeteostatError, Month, Year};
+    /// # use meteostat::{Meteostat, MeteostatError, Month, Year, RequiredData};
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), MeteostatError> {
     /// let client = Meteostat::new().await?;
     /// let station_id = "06240"; // Amsterdam Schiphol
     ///
-    /// // Fetch monthly data for the specified station
-    /// let monthly_lazy = client.monthly().station(station_id).call().await?;
+    /// // Fetch monthly data for the specified station, requiring inventory for 2023
+    /// let monthly_lazy = client
+    ///     .monthly()
+    ///     .station(station_id)                // Required: Start builder with station ID
+    ///     .required_data(RequiredData::FullYear(2023)) // Optional: Filter by inventory
+    ///     .call()                             // Required: Execute the fetch
+    ///     .await?;                            // -> Result<MonthlyLazyFrame, MeteostatError>
     ///
-    /// // Filter for a specific month (e.g., July 2023) and collect
+    /// // Filter the result for a specific month (e.g., July 2023) and collect
     /// let july_2023_df = monthly_lazy.get_at(Month::new(7, 2023))?.frame.collect()?;
     /// println!("Monthly data for station {} in July 2023:\n{}", station_id, july_2023_df);
     /// # Ok(())
@@ -164,6 +193,7 @@ impl<'a> MonthlyClient<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{RequiredData, Year}; // Import for tests
 
     // Helper to create a known location (Berlin Mitte)
     fn berlin_location() -> LatLon {
@@ -184,6 +214,29 @@ mod tests {
             .frame
             .collect()?;
         assert!(data.height() > 0, "Expected some monthly data");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_monthly_from_station_with_filter() -> Result<(), MeteostatError> {
+        let client = Meteostat::new().await?;
+        let data = client
+            .monthly()
+            .station("10382") // Schiphol
+            // Require inventory to show data for 2023
+            .required_data(RequiredData::FullYear(2023))
+            .call()
+            .await?
+            .get_for_period(Year(2023))?
+            .frame
+            .collect()?;
+        // If the filter passes based on inventory, we should get data.
+        // The number of rows might vary, but should be > 0.
+        // Checking for exactly 12 might be too strict if inventory/data isn't perfect.
+        assert!(
+            data.height() > 0,
+            "Expected > 0 rows of monthly data for 2023 after inventory filter"
+        );
         Ok(())
     }
 

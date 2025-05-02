@@ -8,6 +8,11 @@ impl Year {
     pub fn get(self) -> i32 {
         self.0
     }
+
+    pub fn is_leap(self) -> bool {
+        // Try to create Feb 29; if it exists, it's a leap year
+        NaiveDate::from_ymd_opt(self.0, 2, 29).is_some()
+    }
 }
 
 impl Display for Year {

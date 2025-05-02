@@ -33,36 +33,64 @@ impl<'a> DailyClient<'a> {
         Self { client }
     }
 
-    /// Fetches daily weather data for a specific weather station ID.
+    /// Initiates a builder to fetch daily weather data for a specific weather station ID.
     ///
-    /// # Arguments
+    /// This method sets the target station ID for the request.
+    /// You can optionally specify `.required_data(RequiredData)` to apply an inventory filter,
+    /// ensuring the station is suitable based on its reported data availability (e.g.,
+    /// requiring data for a specific year using `RequiredData::FullYear(2023)`).
     ///
-    /// * `station` - The unique identifier string of the weather station (e.g., "06240").
+    /// Finally, call `.call().await` on the resulting builder object to execute the
+    /// data fetch.
+    ///
+    /// # Arguments (Initial Builder Method)
+    ///
+    /// * `station` - The unique identifier string of the weather station (e.g., "06240")
+    ///   passed to the initial `.station()` call.
+    ///
+    /// # Optional Builder Methods
+    ///
+    /// * `.required_data(RequiredData)`: Filters the request based on the station's
+    ///   advertised data inventory. This is useful for ensuring the station is likely
+    ///   to have the data you need before attempting the potentially costly download.
+    ///   For example, `RequiredData::FullYear(2023)` would check if the station inventory
+    ///   indicates daily data for the full year 2023. If the filter isn't met, the fetch
+    ///   might fail early or return an error. Defaults to `None` (no inventory pre-filtering).
     ///
     /// # Returns
     ///
-    /// A `Result` containing a [`DailyLazyFrame`] on success, allowing further
-    /// processing or collection of the data (e.g., filtering by date). Returns a
-    /// [`MeteostatError`] if the data cannot be fetched.
+    /// After calling `.call().await`, returns a `Result` containing a [`DailyLazyFrame`]
+    /// on success. This lazy frame holds all available daily data for the station, which
+    /// can then be further filtered (e.g., by date range) or collected. Returns a
+    /// [`MeteostatError`] if the data cannot be fetched or if the `required_data`
+    /// filter is not met according to the station inventory.
     ///
     /// # Errors
     ///
-    /// Can return [`MeteostatError::WeatherData`] if fetching or parsing the underlying
-    /// data file fails (e.g., network error, file not found, CSV parse error).
+    /// Can return:
+    /// *   [`MeteostatError::WeatherData`]: If fetching or parsing the underlying data file fails
+    ///     (e.g., network error, file not found, CSV parse error).
+    /// *   Could also potentially return an error related to unmet `required_data` criteria
+    ///     if the inventory check fails before attempting the fetch (depends on internal logic).
     ///
     /// # Example
     ///
     /// ```no_run
-    /// # use meteostat::{Meteostat, MeteostatError, Year};
+    /// # use meteostat::{Meteostat, MeteostatError, Year, RequiredData};
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), MeteostatError> {
     /// let client = Meteostat::new().await?;
     /// let station_id = "06240"; // Amsterdam Schiphol
     ///
-    /// // Fetch daily data for the specified station
-    /// let daily_lazy = client.daily().station(station_id).call().await?;
+    /// // Fetch daily data for the specified station, requiring inventory to show data for 2023
+    /// let daily_lazy = client
+    ///     .daily()
+    ///     .station(station_id)             // Required: Start builder with station ID
+    ///     .required_data(RequiredData::FullYear(2023)) // Optional: Filter by inventory
+    ///     .call()                          // Required: Execute the fetch
+    ///     .await?;                         // -> Result<DailyLazyFrame, MeteostatError>
     ///
-    /// // Filter for a specific year and collect
+    /// // Filter the result for a specific year (even if already filtered by inventory) and collect
     /// let daily_2023_df = daily_lazy.get_for_period(Year(2023))?.frame.collect()?;
     /// println!("Daily data for station {} in 2023:\n{}", station_id, daily_2023_df.head(Some(5)));
     /// # Ok(())
@@ -189,6 +217,25 @@ mod tests {
             .frame
             .collect()?;
         assert!(data.height() > 0, "Expected some daily data for 2023");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_daily_from_station_with_filter() -> Result<(), MeteostatError> {
+        let client = Meteostat::new().await?;
+        let data = client
+            .daily()
+            .station("06240") // Schiphol
+            .required_data(RequiredData::FullYear(2023))
+            .call()
+            .await?
+            .get_for_period(Year(2023))? // Still filter the result frame
+            .frame
+            .collect()?;
+        assert!(
+            data.height() > 300,
+            "Expected >300 days of data for 2023 after inventory filter"
+        );
         Ok(())
     }
 
