@@ -1,6 +1,6 @@
 [package]
 name = "meteostat"
-version = "0.4.1"
+version = "0.4.2"
 edition = "2021"
 license = "Apache-2.0"
 description = "Get historic weather data from thousands of weather stations around the world."

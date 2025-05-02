@@ -255,8 +255,8 @@ You can easily use the `DataFrame` output with plotting libraries like `plotlars
 // Requires the 'examples' feature: cargo run --example graph_data --features examples
 use std::error::Error;
 
-use meteostat::{Frequency, LatLon, Meteostat, MeteostatError, Year}; // Updated import
-use plotlars::{Line, LinePlot, Plot, Rgb, Text};
+use meteostat::{Frequency, LatLon, Meteostat, MeteostatError, Year};
+use plotlars::{Line, Plot, Rgb, TimeSeriesPlot};
 use polars::prelude::*;
 
 #[tokio::main]
@@ -285,23 +285,22 @@ async fn main() -> Result<(), Box<dyn Error>> {
 }
 
 fn plot_temperature(dataset: &DataFrame) {
-    LinePlot::builder()
+    TimeSeriesPlot::builder()
         .data(dataset)
         .x("date")
-        .y("tavg") // Average temperature
-        .additional_lines(vec!["tmin", "tmax"]) // Min and Max temps
+        .y("tavg")
+        .additional_series(vec!["tmin", "tmax"])
         .colors(vec![
-            Rgb(120, 120, 120), // Grey for average
-            Rgb(69, 143, 196),  // Blue for min
-            Rgb(199, 115, 42),  // Orange for max
+            Rgb(120, 120, 120), // tavg
+            Rgb(69, 143, 196),  // tmin
+            Rgb(199, 115, 42),  // tmax
         ])
-        .lines(vec![Line::Solid, Line::Dot, Line::Dot])
-        .width(3.0)
-        .plot_title(
-            Text::from("Temperature at De Bilt (2023)")
-                .font("Arial")
-                .size(18),
-        )
+        .lines(vec![
+            Line::Solid,
+            Line::Dot,
+            Line::Dot,
+        ])
+        .plot_title("Temperature at De Bilt (2023)")
         .build()
         .plot();
 }
