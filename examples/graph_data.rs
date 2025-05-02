@@ -51,11 +51,7 @@ fn plot_temperature(dataset: &DataFrame) {
             Rgb(69, 143, 196),  // tmin
             Rgb(199, 115, 42),  // tmax
         ])
-        .lines(vec![
-            Line::Solid,
-            Line::Dot,
-            Line::Dot,
-        ])
+        .lines(vec![Line::Solid, Line::Dot, Line::Dot])
         .plot_title("Temperature at De Bilt (2023)")
         .build()
         .plot();
