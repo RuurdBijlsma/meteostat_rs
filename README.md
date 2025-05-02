@@ -53,63 +53,43 @@ cargo add meteostat
 Here's a quick example demonstrating fetching data by location and station ID:
 
 ```rust
-use meteostat::{Meteostat, LatLon, MeteostatError, Month, Year};
+use meteostat::{Meteostat, LatLon, MeteostatError, Year};
 use polars::prelude::*;
-use chrono::{DateTime, Utc, TimeZone};
+use chrono::{NaiveDate};
 
 #[tokio::main]
 async fn main() -> Result<(), MeteostatError> {
-    // Initialize the client (uses default cache directory)
     let client = Meteostat::new().await?;
-
-    // --- Example 1: Get Hourly data for a location ---
-    let berlin_center = LatLon(52.52, 13.40);
-    let hourly_lazy = client                  // Start with the main client
-        .hourly()                 // Select the hourly data client
-        .location(berlin_center)  // Specify location (returns builder)
-        .call()                   // Execute the location request
-        .await?;                  // -> Result<HourlyLazyFrame, MeteostatError>
-
-    // Filter the HourlyLazyFrame for a specific time range
-    let start_datetime = Utc.with_ymd_and_hms(2022, 1, 10, 0, 0, 0).unwrap(); // Jan 10 2022 00:00 UTC
-    let end_datetime = Utc.with_ymd_and_hms(2022, 1, 10, 5, 59, 59).unwrap(); // Jan 10 2022 05:59 UTC
-    let specific_hours_lazy = hourly_lazy
-        .get_range(start_datetime, end_datetime)?; // Use range filter on HourlyLazyFrame
-
-    // Collect the results into a Polars DataFrame
-    let specific_hours_df = specific_hours_lazy
-        .frame // Access the underlying Polars LazyFrame
-        .collect()?; // Collect the results
-
-    println!(
-        "Hourly data near Berlin for 2022-01-10 00:00-05:59:\n{}",
-        specific_hours_df.head(Some(6)) // Show up to 6 hours
-    );
-
-
-    // --- Example 2: Get Daily data for a station ID ---
-    let station_id = "10637"; // Amsterdam Schiphol
-    let daily_lazy = client                   // Start with the main client
-        .daily()                  // Select the daily data client
-        .station(station_id)      // Specify station ID
-        .await?;                  // -> DailyLazyFrame
-
-    // Filter the DailyLazyFrame for a specific year
-    let daily_2023_lazy = daily_lazy
-        .get_for_period(Year(2023))?; // Use period filter on DailyLazyFrame
-
-    // Collect the results into a Polars DataFrame
-    let daily_2023_df = daily_2023_lazy
-        .frame // Access the underlying Polars LazyFrame
-        .collect()?;
-
-    println!(
-        "\nDaily data for Station {} in {}:\n{}",
-        station_id,
-        2023,
-        daily_2023_df.head(Some(5))
-    );
-
+    // Period for which we want hourly data:
+    let period = NaiveDate::from_ymd_opt(2023, 9, 1).unwrap();
+    // --- Example 1: Collect 24 hourly data points into `Vec<Hourly>` ---
+    let hourly_vec = client
+        .hourly()
+        .location(LatLon(52.0836403, 5.1257283))
+        .call()
+        .await? // `HourlyLazyFrame`
+        .get_for_period(period)? // `HourlyLazyFrame` with filter plan
+        .collect_hourly()?; // `Vec<Hourly>`
+    // Do something with the hourly data...
+    
+    // --- Example 2: Collect daily data from 2023 into a `DataFrame` ---
+    // Explicit call to find stations just for the example, the params here can also be set on client.hourly().location(...
+    let stations = client.find_stations()
+        .location(LatLon(52.520008, 13.404954))
+        .max_distance_km(50.0) // Station must be within 50 km of the location
+        .inventory_request(InventoryRequest::new(Frequency::Daily, RequiredData::FullYear(2023))) // Station must have daily data from 2023
+        .call()
+        .await?; // `Vec<Station>` sorted by distance to the location, closest first.
+    
+    let daily_df = client
+        .daily()
+        .station(&stations.first().unwrap().id)
+        .call()
+        .await? // `DailyLazyFrame`
+        .get_for_period(Year(2023))? // `DailyLazyFrame`
+        .frame // `LazyFrame`
+        .collect()?; // `DataFrame` with 365 rows
+    // Do something with the daily data...
     Ok(())
 }
 ```
