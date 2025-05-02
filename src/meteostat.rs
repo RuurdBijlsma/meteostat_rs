@@ -8,10 +8,7 @@ use crate::stations::locate_station::{StationLocator, BINCODE_CACHE_FILE_NAME};
 use crate::utils::{ensure_cache_dir_exists, get_cache_dir};
 use crate::weather_data::frame_fetcher::FrameFetcher;
 use crate::RequiredData::Any;
-use crate::{
-    ClimateClient, DailyClient, Frequency, HourlyClient, MeteostatError, MonthlyClient,
-    RequiredData, Station,
-};
+use crate::{ClimateClient, DailyClient, Frequency, HourlyClient, MeteostatError, MonthlyClient, RequiredData, Station};
 use bon::bon;
 use polars::prelude::LazyFrame;
 use std::io;

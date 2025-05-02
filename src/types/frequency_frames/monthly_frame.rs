@@ -384,7 +384,7 @@ impl MonthlyLazyFrame {
             let month_opt: Option<u32> = month_ca
                 .get(i)
                 .and_then(|m| u32::try_from(m).ok())
-                .filter(|&m| m >= 1 && m <= 12); // Validate month range
+                .filter(|&m| (1..=12).contains(&m)); // Validate month range
 
             let (Some(year), Some(month)) = (year_opt, month_opt) else {
                 // Skip row if year or month is missing or invalid
@@ -541,13 +541,15 @@ mod tests {
 
             // Check first row is >= start
             assert!(
-                first_year > start_month.year() as i64 ||
-                    (first_year == start_month.year() as i64 && first_month >= start_month.month() as i64)
+                first_year > start_month.year() as i64
+                    || (first_year == start_month.year() as i64
+                        && first_month >= start_month.month() as i64)
             );
             // Check last row is <= end
             assert!(
-                last_year < end_month.year() as i64 ||
-                    (last_year == end_month.year() as i64 && last_month <= end_month.month() as i64)
+                last_year < end_month.year() as i64
+                    || (last_year == end_month.year() as i64
+                        && last_month <= end_month.month() as i64)
             );
 
             // If exactly expected rows, check bounds precisely
@@ -558,7 +560,6 @@ mod tests {
                 assert_eq!(last_month, 2);
             }
         }
-
 
         Ok(())
     }
@@ -575,14 +576,15 @@ mod tests {
         assert!(
             df.height() <= 12,
             "Expected at most 12 rows for year {}, found {}",
-            target_year.get(), df.height()
+            target_year.get(),
+            df.height()
         );
         assert!(
             df.height() > 6, // Expect most months usually
             "Expected more than 6 rows for year {}, found {}",
-            target_year.get(), df.height()
+            target_year.get(),
+            df.height()
         );
-
 
         // Verify all records are from the target year if any exist
         if df.height() > 0 {
@@ -601,7 +603,6 @@ mod tests {
             }
         }
 
-
         Ok(())
     }
 
@@ -615,11 +616,7 @@ mod tests {
         let result_lazy = monthly_lazy.get_range(start_month, end_month)?;
         let df = result_lazy.frame.collect()?;
 
-        assert_eq!(
-            df.height(),
-            0,
-            "Expected zero rows for a past month range"
-        );
+        assert_eq!(df.height(), 0, "Expected zero rows for a past month range");
 
         Ok(())
     }
@@ -690,7 +687,10 @@ mod tests {
             assert!(first_record.year >= start_month.year());
             assert!(first_record.year <= end_month.year());
             // Could add more specific month check logic if needed
-            assert!(first_record.average_temperature.is_some() || first_record.average_temperature.is_none());
+            assert!(
+                first_record.average_temperature.is_some()
+                    || first_record.average_temperature.is_none()
+            );
             assert!(first_record.precipitation.is_some() || first_record.precipitation.is_none());
         }
         Ok(())
@@ -708,12 +708,15 @@ mod tests {
         assert_eq!(monthly_record.year, target_month.year());
         assert_eq!(monthly_record.month, target_month.month());
         assert!(monthly_record.average_temperature.is_some());
-        assert!(monthly_record.sunshine_minutes.is_some() || monthly_record.sunshine_minutes.is_none()); // tsun often null
+        assert!(
+            monthly_record.sunshine_minutes.is_some() || monthly_record.sunshine_minutes.is_none()
+        ); // tsun often null
         Ok(())
     }
 
     #[tokio::test]
-    async fn test_collect_monthly_single_row_fail_multiple_rows() -> Result<(), Box<dyn std::error::Error>> {
+    async fn test_collect_monthly_single_row_fail_multiple_rows(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let monthly_lazy = get_test_monthly_frame().await?;
         // Use a range that will yield multiple rows (a full year)
         let target_year = Year(2020);
@@ -737,7 +740,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_collect_monthly_single_row_fail_zero_rows() -> Result<(), Box<dyn std::error::Error>> {
+    async fn test_collect_monthly_single_row_fail_zero_rows(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let monthly_lazy = get_test_monthly_frame().await?;
         // Use a month without data (far past)
         let ancient_month = Month::new(6, 1850);

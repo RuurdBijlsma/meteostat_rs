@@ -156,6 +156,28 @@ fn bench(c: &mut Criterion) {
         });
     });
 
+    c.bench_function(
+        "meteostat.from_location.hourly+filter+collect_to_single_struct",
+        |b| {
+            b.iter(|| {
+                rt.block_on(async {
+                    let moment = Utc.with_ymd_and_hms(2023, 10, 26, 0, 0, 0).unwrap();
+
+                    let _lazy_frame = meteostat
+                        .hourly()
+                        .location(black_box(LatLon(50.038, 8.559)))
+                        .call()
+                        .await
+                        .unwrap()
+                        .get_at(black_box(moment))
+                        .unwrap()
+                        .collect_single_hourly()
+                        .unwrap();
+                });
+            });
+        },
+    );
+
     c.bench_function("meteostat.find_stations", |b| {
         b.iter(|| {
             rt.block_on(async {

@@ -255,7 +255,7 @@ impl DailyLazyFrame {
             .collect()
             .map_err(MeteostatError::PolarsError)?;
 
-        Self::dataframe_to_daily_vec(&df) 
+        Self::dataframe_to_daily_vec(&df)
     }
 
     /// Executes the lazy query, expecting exactly one row, and collects it into a `Daily` struct.
@@ -341,7 +341,7 @@ impl DailyLazyFrame {
         let tsun_series = df.column("tsun")?;
 
         // --- Get ChunkedArrays (handle potential type variations if needed) ---
-        let date_ca = date_series.date()?; 
+        let date_ca = date_series.date()?;
         let tavg_ca = tavg_series.f64()?;
         let tmin_ca = tmin_series.f64()?;
         let tmax_ca = tmax_series.f64()?;

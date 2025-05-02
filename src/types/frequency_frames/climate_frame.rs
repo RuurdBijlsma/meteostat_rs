@@ -326,12 +326,11 @@ impl ClimateLazyFrame {
             // Get year and month (essential) - skip row if missing or invalid
             let start_year_opt: Option<i32> =
                 start_year_ca.get(i).and_then(|y| i32::try_from(y).ok());
-            let end_year_opt: Option<i32> =
-                end_year_ca.get(i).and_then(|y| i32::try_from(y).ok());
+            let end_year_opt: Option<i32> = end_year_ca.get(i).and_then(|y| i32::try_from(y).ok());
             let month_opt: Option<u32> = month_ca
                 .get(i)
                 .and_then(|m| u32::try_from(m).ok())
-                .filter(|&m| m >= 1 && m <= 12); // Validate month range
+                .filter(|&m| (1..=12).contains(&m)); // Validate month range
 
             let (Some(start_year), Some(end_year), Some(month)) =
                 (start_year_opt, end_year_opt, month_opt)
@@ -519,17 +518,17 @@ mod tests {
         );
 
         // Expect some data (likely 12 or 24 rows for standard periods)
-        assert!(
-            !climate_vec.is_empty(),
-            "Expected some climate normal data"
-        );
+        assert!(!climate_vec.is_empty(), "Expected some climate normal data");
 
         // Check the first record if it exists
         if let Some(first_record) = climate_vec.first() {
             println!("First collected record: {:?}", first_record);
             assert!(first_record.start_year == 1961 || first_record.start_year == 1991); // Common periods
             assert!(first_record.month >= 1 && first_record.month <= 12);
-            assert!(first_record.minimum_temperature.is_some() || first_record.minimum_temperature.is_none());
+            assert!(
+                first_record.minimum_temperature.is_some()
+                    || first_record.minimum_temperature.is_none()
+            );
         }
         Ok(())
     }
