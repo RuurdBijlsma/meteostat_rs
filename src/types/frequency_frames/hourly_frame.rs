@@ -84,7 +84,7 @@ impl HourlyLazyFrame {
     ///
     /// * `frame` - A `LazyFrame` assumed to contain hourly weather data with the expected schema,
     ///   including a "datetime" column interpretable as timezone-naive UTC.
-    pub fn new(frame: LazyFrame) -> Self {
+    pub(crate) fn new(frame: LazyFrame) -> Self {
         Self { frame }
     }
 
@@ -276,7 +276,7 @@ impl HourlyLazyFrame {
     /// let year_data_lazy = hourly_lazy.get_for_period(Year(2022))?;
     ///
     /// // Collect into Vec<Hourly>
-    /// let hourly_vec: Vec<Hourly> = year_data_lazy.collect_hourly_vec()?;
+    /// let hourly_vec: Vec<Hourly> = year_data_lazy.collect_hourly()?;
     ///
     /// println!("Collected {} hourly records for 2022.", hourly_vec.len());
     /// if let Some(first_hour) = hourly_vec.first() {
@@ -285,7 +285,7 @@ impl HourlyLazyFrame {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn collect_hourly_vec(&self) -> Result<Vec<Hourly>, MeteostatError> {
+    pub fn collect_hourly(&self) -> Result<Vec<Hourly>, MeteostatError> {
         let df = self
             .frame
             .clone() // Clone frame as collect consumes it
@@ -331,7 +331,7 @@ impl HourlyLazyFrame {
     /// let single_hour_lazy = hourly_lazy.get_at(target_dt)?;
     ///
     /// // Collect the single expected row
-    /// match single_hour_lazy.collect_hourly() {
+    /// match single_hour_lazy.collect_single_hourly() {
     ///     Ok(hourly_data) => {
     ///         println!("Collected single hour data: {:?}", hourly_data);
     ///         assert_eq!(hourly_data.datetime.hour(), 10); // Verify correct hour
@@ -346,7 +346,7 @@ impl HourlyLazyFrame {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn collect_hourly(&self) -> Result<Hourly, MeteostatError> {
+    pub fn collect_single_hourly(&self) -> Result<Hourly, MeteostatError> {
         let df = self
             .frame
             .clone()
@@ -677,7 +677,7 @@ mod tests {
         let expected_max_rows = 4;
 
         let result_lazy = hourly_lazy.get_range(start_dt, end_dt)?;
-        let hourly_vec = result_lazy.collect_hourly_vec()?;
+        let hourly_vec = result_lazy.collect_hourly()?;
 
         assert!(
             hourly_vec.len() <= expected_max_rows,
@@ -720,7 +720,7 @@ mod tests {
         let target_dt = Utc.with_ymd_and_hms(2021, 7, 10, 18, 0, 0).unwrap(); // Expect exact hour match
 
         let single_hour_lazy = hourly_lazy.get_at(target_dt)?;
-        let hourly_record = single_hour_lazy.collect_hourly()?;
+        let hourly_record = single_hour_lazy.collect_single_hourly()?;
 
         println!("Collected single record: {:?}", hourly_record);
         assert_eq!(hourly_record.datetime, target_dt);
@@ -738,7 +738,7 @@ mod tests {
         let end_dt = Utc.with_ymd_and_hms(2022, 3, 3, 5, 0, 0).unwrap(); // 6 hours
 
         let multi_hour_lazy = hourly_lazy.get_range(start_dt, end_dt)?;
-        let result = multi_hour_lazy.collect_hourly(); // Expect this to fail
+        let result = multi_hour_lazy.collect_single_hourly(); // Expect this to fail
 
         assert!(result.is_err());
         let err = result.err().unwrap();
@@ -762,7 +762,7 @@ mod tests {
         let future_dt = Utc.with_ymd_and_hms(1820, 1, 1, 12, 0, 0).unwrap();
 
         let zero_hour_lazy = hourly_lazy.get_at(future_dt)?;
-        let result = zero_hour_lazy.collect_hourly(); // Expect this to fail
+        let result = zero_hour_lazy.collect_single_hourly(); // Expect this to fail
 
         assert!(result.is_err());
         let err = result.err().unwrap();
@@ -786,7 +786,7 @@ mod tests {
         let future_dt_end = Utc.with_ymd_and_hms(1818, 1, 1, 23, 59, 59).unwrap();
 
         let empty_lazy = hourly_lazy.get_range(future_dt_start, future_dt_end)?;
-        let hourly_vec = empty_lazy.collect_hourly_vec()?;
+        let hourly_vec = empty_lazy.collect_hourly()?;
 
         assert!(
             hourly_vec.is_empty(),
