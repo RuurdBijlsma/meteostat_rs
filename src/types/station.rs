@@ -2,12 +2,20 @@
 //! including inventory, location, and identifiers. Also includes implementations
 //! necessary for spatial indexing using the `rstar` crate.
 
+use crate::LatLon;
 use chrono::NaiveDate;
 use rstar::{PointDistance, RTreeObject, AABB};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-
 // --- Data Structures ---
+
+/// Links a station with a distance to a point.
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct StationWithDistance {
+    pub station: Station,
+    pub distance_km: f64,
+    pub requested_point: LatLon,
+}
 
 /// Represents a single Meteostat weather station and its associated metadata.
 ///
@@ -30,7 +38,7 @@ pub struct Station {
     /// Other known identifiers for the station.
     pub identifiers: Identifiers,
     /// Geographical location details (latitude, longitude, elevation).
-    pub location: Location,
+    pub location: StationLocation,
     /// Information about the availability periods for different data frequencies.
     pub inventory: Inventory,
 }
@@ -89,7 +97,7 @@ pub struct Identifiers {
 
 /// Represents the geographical location of a weather station.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub struct Location {
+pub struct StationLocation {
     /// Latitude in decimal degrees (positive for North, negative for South).
     pub latitude: f64,
     /// Longitude in decimal degrees (positive for East, negative for West).

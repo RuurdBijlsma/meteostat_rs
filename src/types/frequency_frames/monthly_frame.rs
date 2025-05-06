@@ -6,10 +6,11 @@ use crate::types::traits::any::any_month::AnyMonth;
 use crate::types::traits::period::month_period::MonthPeriod;
 use crate::MeteostatError;
 use polars::prelude::{col, lit, DataFrame, Expr, LazyFrame};
+use serde::{Deserialize, Serialize};
 // Added DataFrame
 
 /// Represents a row of monthly weather data, suitable for collecting results.
-#[derive(Debug, Clone, PartialEq)] // Made public and added derives
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct Monthly {
     /// The year of the observation.
     pub year: i32, // Use i32 for year

@@ -7,9 +7,10 @@ use crate::types::traits::period::datetime_period::DateTimePeriod;
 use crate::{MeteostatError, WeatherCondition};
 use chrono::{DateTime, Duration, NaiveDateTime, TimeZone, Timelike, Utc};
 use polars::prelude::{col, lit, DataFrame, Expr, LazyFrame};
+use serde::{Deserialize, Serialize};
 
 /// Represents a row of hourly weather data, suitable for collecting results.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct Hourly {
     /// The specific date and time (UTC) for this observation.
     pub datetime: DateTime<Utc>, // Non-optional, assuming we only collect valid rows

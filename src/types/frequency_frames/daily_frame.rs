@@ -7,9 +7,10 @@ use crate::types::traits::period::date_period::DatePeriod;
 use crate::MeteostatError;
 use chrono::{Duration, NaiveDate};
 use polars::prelude::{col, lit, DataFrame, Expr, LazyFrame};
+use serde::{Deserialize, Serialize};
 
 /// Represents a row of daily weather data, suitable for collecting results.
-#[derive(Debug, Clone, PartialEq)] // Made public and added derives
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct Daily {
     /// The specific date for this observation.
     pub date: NaiveDate, // Non-optional

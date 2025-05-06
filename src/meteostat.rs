@@ -5,15 +5,17 @@
 //! either by station ID or by geographical location.
 
 use crate::stations::locate_station::{StationLocator, BINCODE_CACHE_FILE_NAME};
+use crate::types::station::StationWithDistance;
 use crate::utils::{ensure_cache_dir_exists, get_cache_dir};
 use crate::weather_data::frame_fetcher::FrameFetcher;
 use crate::RequiredData::Any;
 use crate::{
     ClimateClient, DailyClient, Frequency, HourlyClient, MeteostatError, MonthlyClient,
-    RequiredData, Station,
+    RequiredData,
 };
 use bon::bon;
 use polars::prelude::LazyFrame;
+use serde::{Deserialize, Serialize};
 use std::io;
 use std::path::PathBuf;
 
@@ -21,12 +23,21 @@ use std::path::PathBuf;
 ///
 /// Used for querying weather stations or data based on location.
 ///
-/// # Fields
+/// # Methods
 ///
-/// * `0` - Latitude in decimal degrees.
-/// * `1` - Longitude in decimal degrees.
-#[derive(Debug, Clone, Copy, PartialEq)]
+/// * `.lat()` - Latitude in decimal degrees.
+/// * `.lon()` - Longitude in decimal degrees.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct LatLon(pub f64, pub f64);
+
+impl LatLon {
+    pub fn lat(&self) -> f64 {
+        self.0
+    }
+    pub fn lon(&self) -> f64 {
+        self.1
+    }
+}
 
 /// Represents criteria for filtering weather stations based on their data inventory.
 ///
@@ -321,8 +332,8 @@ impl Meteostat {
     ///     .await?;
     ///
     /// println!("Found {} stations near NYC matching criteria:", stations.len());
-    /// for station in stations {
-    ///     println!("  - ID: {}, Name: {:?}", station.id, station.name.get("en"));
+    /// for result in stations {
+    ///     println!("  - ID: {}, Name: {:?}, Distance: {}", result.station.id, result.station.name.get("en"), result.distance_km);
     /// }
     /// # Ok(())
     /// # }
@@ -334,7 +345,7 @@ impl Meteostat {
         inventory_request: Option<InventoryRequest>,
         max_distance_km: Option<f64>,
         station_limit: Option<usize>,
-    ) -> Result<Vec<Station>, MeteostatError> {
+    ) -> Result<Vec<StationWithDistance>, MeteostatError> {
         // Note: The defaults below are applied *if* the corresponding builder method was not called.
         let max_distance_km = max_distance_km.unwrap_or(50.0);
         let stations_limit = station_limit.unwrap_or(5); // Default limit for find_stations
@@ -356,7 +367,11 @@ impl Meteostat {
         // Extract stations and discard distances
         Ok(stations_with_distance
             .into_iter()
-            .map(|(station, _distance)| station) // Discard the distance for the return type
+            .map(|(station, distance)| StationWithDistance {
+                distance_km: distance,
+                station,
+                requested_point: location,
+            })
             .collect())
     }
 
@@ -763,7 +778,7 @@ mod tests {
         // Ensure station cache exists
         let berlin = berlin_location();
         let stations = client.find_stations().location(berlin).call().await?;
-        let station_id = &stations[0].id;
+        let station_id = &stations.first().unwrap().station.id;
         let _lf = client.hourly().station(station_id).call().await?;
         println!("Found station ID: {}", station_id);
         assert!(cache_file_exists(&cache_path, station_id, Frequency::Hourly).await);
@@ -883,8 +898,12 @@ mod tests {
             "Should return at most the default limit (5)"
         );
         println!("Found {} stations (default limit 5):", stations.len());
-        for station in stations.iter().take(5) {
-            println!("  - {} ({:?})", station.id, station.name.get("en"));
+        for result in stations.iter().take(5) {
+            println!(
+                "  - {} ({:?})",
+                result.station.id,
+                result.station.name.get("en")
+            );
         }
         Ok(())
     }
@@ -909,8 +928,12 @@ mod tests {
             limit
         );
         println!("Found {} stations (limit {}):", stations.len(), limit);
-        for station in &stations {
-            println!("  - {} ({:?})", station.id, station.name.get("en"));
+        for result in &stations {
+            println!(
+                "  - {} ({:?})",
+                result.station.id,
+                result.station.name.get("en")
+            );
         }
         Ok(())
     }
@@ -930,8 +953,12 @@ mod tests {
 
         // Might still find stations, but possibly fewer than default distance
         println!("Found {} stations within {} km:", stations.len(), max_dist);
-        for station in &stations {
-            println!("  - {} ({:?})", station.id, station.name.get("en"));
+        for result in &stations {
+            println!(
+                "  - {} ({:?})",
+                result.station.id,
+                result.station.name.get("en")
+            );
         }
         // We can't easily assert the *exact* number, just that the call works.
         assert!(stations.len() <= 5); // Still respects default limit
@@ -962,8 +989,12 @@ mod tests {
             "Found {} stations with Daily data for 2022:",
             stations.len()
         );
-        for station in &stations {
-            println!("  - {} ({:?})", station.id, station.name.get("en"));
+        for result in &stations {
+            println!(
+                "  - {} ({:?})",
+                result.station.id,
+                result.station.name.get("en")
+            );
         }
         // A more robust test would involve checking the inventory details of the returned stations,
         // but that requires parsing the station metadata more deeply.
