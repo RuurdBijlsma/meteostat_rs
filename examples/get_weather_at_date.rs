@@ -1,6 +1,6 @@
 use chrono::NaiveDate;
-use serde_json::to_string_pretty;
 use meteostat::{LatLon, Meteostat, MeteostatError};
+use serde_json::to_string_pretty;
 
 #[tokio::main]
 async fn main() -> Result<(), MeteostatError> {
