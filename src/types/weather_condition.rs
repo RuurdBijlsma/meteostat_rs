@@ -1,6 +1,8 @@
 //! Defines the `WeatherCondition` enum, mapping Meteostat's numeric weather condition codes
 //! to descriptive variants.
 
+use serde::{Deserialize, Serialize};
+
 /// Represents the weather condition code reported by Meteostat.
 ///
 /// This enum maps the integer codes found in the `coco` column of hourly data
@@ -10,7 +12,7 @@
 ///
 /// You can convert an integer code (e.g., from a Polars DataFrame) into this enum
 /// using the [`WeatherCondition::from_i64`] method.
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy, Deserialize, Serialize)]
 pub enum WeatherCondition {
     /// Code 1: Sky is clear.
     Clear = 1,

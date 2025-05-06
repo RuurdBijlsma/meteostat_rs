@@ -189,11 +189,11 @@ mod tests {
         client
             .find_stations()
             .location(berlin)
-            .station_limit(1) // Need just one
+            .station_limit(1)
             .call()
             .await?
             .first()
-            .map(|s| s.id.clone())
+            .map(|s| s.station.id.clone())
             .ok_or_else(|| MeteostatError::NoStationWithinRadius {
                 radius: 50.0,
                 lat: berlin.0,

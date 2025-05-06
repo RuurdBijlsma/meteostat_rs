@@ -5,10 +5,11 @@
 use crate::{MeteostatError, Year};
 // Added MeteostatError
 use polars::prelude::{col, lit, DataFrame, Expr, LazyFrame};
+use serde::{Deserialize, Serialize};
 // Added DataFrame
 
 /// Represents a row of climate normals data, suitable for collecting results.
-#[derive(Debug, Clone, PartialEq)] // Made public and added derives
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)] // Made public and added derives
 pub struct Climate {
     /// The starting year of the climate normal period.
     pub start_year: i32,

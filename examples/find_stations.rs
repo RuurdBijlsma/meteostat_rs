@@ -16,9 +16,14 @@ async fn main() -> Result<(), MeteostatError> {
         .call()
         .await?;
 
-    println!("\nNearest stations to {} {}", lat, lon);
-    for station in nearest {
-        println!("ID: {}, Name: {:?}", station.id, station.name.get("en"));
+    println!("\nNearest stations to {:.1} {:.1}", lat, lon);
+    for result in nearest {
+        println!(
+            "ID: {}, Name: {:?}, Distance: {:.1} km",
+            result.station.id,
+            result.station.name.get("en"),
+            result.distance_km,
+        );
     }
     Ok(())
 }
