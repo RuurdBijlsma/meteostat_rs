@@ -1,1 +1,0 @@
-Er zit een bug in .required_data(SpecificDate(datetime.date_naive)) (zie test_on_hdr in media_analyzer_rs)
