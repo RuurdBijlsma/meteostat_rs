@@ -44,6 +44,9 @@ $env:RUSTFLAGS = "-Dwarnings"
 $checksPassed = $true
 
 try {
+    # Build
+    cargo build --all-targets --all-features
+
     # Format check
     Write-Host "`n=== Checking formatting with rustfmt ===" -ForegroundColor Cyan
     cargo fmt --all
@@ -61,16 +64,9 @@ try {
         $checksPassed = $false
     }
 
-    # Build in release mode
-    Write-Host "`n=== Building in release mode ===" -ForegroundColor Cyan
-    cargo build --release --verbose
-    if ($LASTEXITCODE -ne 0) {
-        $checksPassed = $false
-    }
-
     # Run tests
     Write-Host "`n=== Running tests ===" -ForegroundColor Cyan
-    cargo test --verbose
+    cargo test
     if ($LASTEXITCODE -ne 0) {
         $checksPassed = $false
     }
