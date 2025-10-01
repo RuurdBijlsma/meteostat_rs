@@ -8,7 +8,7 @@ async fn main() -> Result<(), MeteostatError> {
 
     let data = client
         .hourly()
-        .location(LatLon(52.520008, 13.404954))
+        .location(LatLon(38.0290805555556, 14.0400277777778))
         .max_distance_km(50.0)
         .call()
         .await?

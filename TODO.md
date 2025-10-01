@@ -1,3 +1,1 @@
-* copy tests from python meteostat https://github.com/meteostat/meteostat-python/blob/master/tests/e2e/test_daily.py
-* overdreven veel comments weghalen
-* check cargo checklist (see exiftool)
+Er zit een bug in .required_data(SpecificDate(datetime.date_naive)) (zie test_on_hdr in media_analyzer_rs)

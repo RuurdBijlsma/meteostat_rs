@@ -92,20 +92,20 @@ impl StationLocator {
         let response = match response.error_for_status() {
             Ok(resp) => resp,
             Err(e) => {
-                if let Some(status) = e.status() {
-                    return Err(LocateStationError::HttpStatus {
+                return if let Some(status) = e.status() {
+                    Err(LocateStationError::HttpStatus {
                         url: DATA_URL.to_string(),
                         status,
                         source: e,
-                    });
+                    })
                 } else {
-                    return Err(LocateStationError::NetworkRequest(DATA_URL.to_string(), e));
+                    Err(LocateStationError::NetworkRequest(DATA_URL.to_string(), e))
                 }
             }
         };
         let stream = response
             .bytes_stream()
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e));
+            .map_err(io::Error::other);
         let stream_reader = StreamReader::new(stream);
         let gzip_decoder = GzipDecoder::new(BufReader::new(stream_reader));
         let mut decoder_reader = BufReader::new(gzip_decoder);
