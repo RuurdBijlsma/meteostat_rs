@@ -139,9 +139,7 @@ impl WeatherDataLoader {
             }
         };
 
-        let stream = response
-            .bytes_stream()
-            .map_err(std::io::Error::other);
+        let stream = response.bytes_stream().map_err(std::io::Error::other);
         let stream_reader = StreamReader::new(stream);
         let mut decoder = GzipDecoder::new(stream_reader);
         let mut decompressed = Vec::new();

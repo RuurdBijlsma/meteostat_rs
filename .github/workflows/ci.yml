@@ -34,16 +34,21 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y libfontconfig1-dev pkg-config
+      - name: Cache and install system dependencies
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: libfontconfig1-dev pkg-config
+          version: 1.0
+
+      # Build the code
+      - name: Build
+        run: cargo build --all-targets --all-features
 
       # Format check
       - name: Check formatting
         run: cargo fmt --all -- --check
 
-      # Strict Clippy checks
+      # Run Clippy
       - name: Run Clippy (strict)
         run: |
           cargo clippy --all-targets --all-features -- -D warnings -A clippy::missing_errors_doc -A clippy::missing_panics_doc

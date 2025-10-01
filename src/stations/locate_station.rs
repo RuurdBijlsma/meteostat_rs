@@ -103,9 +103,7 @@ impl StationLocator {
                 }
             }
         };
-        let stream = response
-            .bytes_stream()
-            .map_err(io::Error::other);
+        let stream = response.bytes_stream().map_err(io::Error::other);
         let stream_reader = StreamReader::new(stream);
         let gzip_decoder = GzipDecoder::new(BufReader::new(stream_reader));
         let mut decoder_reader = BufReader::new(gzip_decoder);
@@ -280,7 +278,7 @@ impl StationLocator {
             );
 
             // --- 3. Check max distance ---
-            if dist_km * 2.0 > max_distance_km {
+            if dist_km > max_distance_km * 2.0 {
                 // It's Joever.
                 break;
             }

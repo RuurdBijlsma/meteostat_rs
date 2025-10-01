@@ -19,10 +19,11 @@ jobs:
           toolchain: stable
           override: true
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y libfontconfig1-dev pkg-config
+      - name: Cache and install system dependencies
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: libfontconfig1-dev pkg-config
+          version: 1.0
 
       - name: Cache cargo registry
         uses: actions/cache@v3
