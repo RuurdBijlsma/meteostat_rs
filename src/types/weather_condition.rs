@@ -2,6 +2,7 @@
 //! to descriptive variants.
 
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
 /// Represents the weather condition code reported by Meteostat.
 ///
@@ -69,6 +70,12 @@ pub enum WeatherCondition {
     /// Code 27: Storm conditions (typically high winds).
     Storm = 27,
     // Note: Codes 0 (Unknown) and 28+ are not explicitly defined by Meteostat as standard conditions.
+}
+
+impl fmt::Display for WeatherCondition {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 impl WeatherCondition {
