@@ -31,7 +31,8 @@ use std::path::PathBuf;
 pub struct LatLon(pub f64, pub f64);
 
 impl LatLon {
-    pub fn lat(&self) -> f64 {
+    #[must_use]
+    pub const fn lat(&self) -> f64 {
         self.0
     }
     pub fn lon(&self) -> f64 {
@@ -348,7 +349,7 @@ impl Meteostat {
     ) -> Result<Vec<StationWithDistance>, MeteostatError> {
         // Note: The defaults below are applied *if* the corresponding builder method was not called.
         let max_distance_km = max_distance_km.unwrap_or(50.0);
-        let stations_limit = station_limit.unwrap_or(5); // Default limit for find_stations
+        let station_limit = station_limit.unwrap_or(5); // Default limit for find_stations
 
         let (freq_option, date_option) = inventory_request
             .map(|req| (Some(req.frequency), Some(req.required_data))) // Pass Some when inventory_request is Some
@@ -358,7 +359,7 @@ impl Meteostat {
         let stations_with_distance = self.station_locator.query(
             location.0,
             location.1,
-            stations_limit,
+            station_limit,
             max_distance_km,
             freq_option,
             date_option,
@@ -447,13 +448,13 @@ impl Meteostat {
         // Note: Defaults applied here if builder methods not called.
         let max_distance_km = max_distance_km.unwrap_or(50.0);
         // Default limit for *candidate stations to try* in from_location is 1.
-        let stations_limit = station_limit.unwrap_or(1);
+        let station_limit = station_limit.unwrap_or(1);
 
         // Query for candidate stations
         let stations = self.station_locator.query(
             location.0,
             location.1,
-            stations_limit, // Limit the number of candidates fetched
+            station_limit, // Limit the number of candidates fetched
             max_distance_km,
             Some(frequency), // Always filter by frequency for from_location
             required_data,   // Apply optional date/inventory filter
