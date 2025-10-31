@@ -13,8 +13,7 @@ async fn main() -> Result<(), MeteostatError> {
         .location(LatLon(lat, lon))
         .max_distance_km(max_km)
         .station_limit(n_results)
-        .call()
-        .await?;
+        .call();
 
     println!("\nNearest stations to {:.1} {:.1}", lat, lon);
     for result in nearest {

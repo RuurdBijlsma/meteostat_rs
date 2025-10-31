@@ -189,9 +189,7 @@ fn bench(c: &mut Criterion) {
                         Frequency::Hourly,
                         RequiredData::FullYear(2020),
                     )))
-                    .call()
-                    .await
-                    .unwrap();
+                    .call();
             });
         });
     });
