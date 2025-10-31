@@ -101,8 +101,8 @@ impl WeatherDataLoader {
             Self::cache_dataframe(df, &parquet_path).await?;
         }
 
-        LazyFrame::scan_parquet(&parquet_path, Default::default())
-            .map_err(|e| WeatherDataError::ParquetScan(parquet_path.clone(), e))
+        LazyFrame::scan_parquet(parquet_path.clone(), Default::default())
+            .map_err(|e| WeatherDataError::ParquetScan(parquet_path, e))
     }
 
     /// Downloads and decompresses data for a specific type and station.

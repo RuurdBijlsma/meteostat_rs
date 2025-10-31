@@ -365,7 +365,7 @@ impl DailyLazyFrame {
         for i in 0..df.height() {
             // Get date (essential) - skip row if missing/invalid
             let date_opt: Option<NaiveDate> = date_ca
-                .get(i) // Returns Option<i32> (days since epoch)
+                .get(i)
                 .map(|days_since_epoch| epoch_date + Duration::days(days_since_epoch as i64));
 
             let Some(date) = date_opt else {
