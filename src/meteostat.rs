@@ -331,8 +331,7 @@ impl Meteostat {
     ///     .max_distance_km(100.0)
     ///     .station_limit(3)
     ///     .inventory_request(inventory_req)
-    ///     .call()
-    ///     .await?;
+    ///     .call();
     ///
     /// println!("Found {} stations near NYC matching criteria:", stations.len());
     /// for result in stations {
