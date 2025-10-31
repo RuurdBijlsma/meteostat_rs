@@ -40,7 +40,7 @@ impl FrameFetcher {
                 if let Some(extension) = file_path.extension() {
                     if extension == OsStr::new("parquet") {
                         match tokio::fs::remove_file(&file_path).await {
-                            Ok(_) => {}
+                            Ok(()) => {}
                             Err(e) if e.kind() == io::ErrorKind::NotFound => {} // Ignore if already gone
                             Err(e) => {
                                 return Err(WeatherDataError::CacheDeletionError(
@@ -54,8 +54,8 @@ impl FrameFetcher {
             }
         }
 
-        let mut cache = self.lazyframe_cache.lock().await;
-        cache.clear();
+        self.lazyframe_cache.lock().await.clear();
+
         Ok(())
     }
 
@@ -70,12 +70,16 @@ impl FrameFetcher {
             station
         ));
         match tokio::fs::remove_file(&file).await {
-            Ok(_) => {}
+            Ok(()) => {}
             Err(e) if e.kind() == io::ErrorKind::NotFound => {}
             Err(e) => return Err(WeatherDataError::CacheDeletionError(file.clone(), e)),
         }
-        let mut cache = self.lazyframe_cache.lock().await;
-        cache.remove(&(station.to_string(), frequency));
+
+        self.lazyframe_cache
+            .lock()
+            .await
+            .remove(&(station.to_string(), frequency));
+
         Ok(())
     }
 
@@ -87,12 +91,11 @@ impl FrameFetcher {
         frequency: Frequency,
         required_data: RequiredData,
     ) -> Result<bool, WeatherDataError> {
-        let required_date = match required_data.get_end_date() {
-            Some(d) => d,
-            None => return Ok(false),
+        let Some(date_required) = required_data.get_end_date() else {
+            return Ok(false);
         };
 
-        if required_date > Utc::now().date_naive() {
+        if date_required > Utc::now().date_naive() {
             return Ok(false);
         }
 
@@ -103,14 +106,14 @@ impl FrameFetcher {
         {
             Ok(Some(modified)) => {
                 let cache_date = modified.date_naive();
-                Ok(required_date > cache_date)
+                Ok(date_required > cache_date)
             }
             Ok(None) => Ok(true),
             Err(e) => Err(e),
         }
     }
 
-    /// Gets a LazyFrame for a given station and frequency, using the cache if possible.
+    /// Gets a `LazyFrame` for a given station and frequency, using the cache if possible.
     /// Handles automatic cache refresh based on `required_data`.
     pub async fn get_cache_lazyframe(
         &self,
@@ -191,7 +194,6 @@ mod tests {
             .location(berlin)
             .station_limit(1)
             .call()
-            .await?
             .first()
             .map(|s| s.station.id.clone())
             .ok_or_else(|| MeteostatError::NoStationWithinRadius {

@@ -29,7 +29,7 @@ impl<'a> DailyClient<'a> {
     /// # Arguments
     ///
     /// * `client` - A reference to the configured `Meteostat` instance.
-    pub(crate) fn new(client: &'a Meteostat) -> Self {
+    pub(crate) const fn new(client: &'a Meteostat) -> Self {
         Self { client }
     }
 

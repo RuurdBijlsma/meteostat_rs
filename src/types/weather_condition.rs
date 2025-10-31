@@ -11,9 +11,9 @@ use std::fmt;
 /// [Meteostat documentation](https://dev.meteostat.net/formats.html#weather-condition-codes)
 /// for the official code definitions.
 ///
-/// You can convert an integer code (e.g., from a Polars DataFrame) into this enum
+/// You can convert an integer code (e.g., from a Polars `DataFrame`) into this enum
 /// using the [`WeatherCondition::from_i64`] method.
-#[derive(Debug, PartialEq, Clone, Copy, Deserialize, Serialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Deserialize, Serialize)]
 pub enum WeatherCondition {
     /// Code 1: Sky is clear.
     Clear = 1,
@@ -73,8 +73,8 @@ pub enum WeatherCondition {
 }
 
 impl fmt::Display for WeatherCondition {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", self)
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{self:?}")
     }
 }
 
@@ -122,35 +122,36 @@ impl WeatherCondition {
     /// }
     /// // Output: It's foggy!
     /// ```
-    pub fn from_i64(value: i64) -> Option<Self> {
+    #[must_use]
+    pub const fn from_i64(value: i64) -> Option<Self> {
         match value {
-            1 => Some(WeatherCondition::Clear),
-            2 => Some(WeatherCondition::Fair),
-            3 => Some(WeatherCondition::Cloudy),
-            4 => Some(WeatherCondition::Overcast),
-            5 => Some(WeatherCondition::Fog),
-            6 => Some(WeatherCondition::FreezingFog),
-            7 => Some(WeatherCondition::LightRain),
-            8 => Some(WeatherCondition::Rain),
-            9 => Some(WeatherCondition::HeavyRain),
-            10 => Some(WeatherCondition::FreezingRain),
-            11 => Some(WeatherCondition::HeavyFreezingRain),
-            12 => Some(WeatherCondition::Sleet),
-            13 => Some(WeatherCondition::HeavySleet),
-            14 => Some(WeatherCondition::LightSnowfall),
-            15 => Some(WeatherCondition::Snowfall),
-            16 => Some(WeatherCondition::HeavySnowfall),
-            17 => Some(WeatherCondition::RainShower),
-            18 => Some(WeatherCondition::HeavyRainShower),
-            19 => Some(WeatherCondition::SleetShower),
-            20 => Some(WeatherCondition::HeavySleetShower),
-            21 => Some(WeatherCondition::SnowShower),
-            22 => Some(WeatherCondition::HeavySnowShower),
-            23 => Some(WeatherCondition::Lightning),
-            24 => Some(WeatherCondition::Hail),
-            25 => Some(WeatherCondition::Thunderstorm),
-            26 => Some(WeatherCondition::HeavyThunderstorm),
-            27 => Some(WeatherCondition::Storm),
+            1 => Some(Self::Clear),
+            2 => Some(Self::Fair),
+            3 => Some(Self::Cloudy),
+            4 => Some(Self::Overcast),
+            5 => Some(Self::Fog),
+            6 => Some(Self::FreezingFog),
+            7 => Some(Self::LightRain),
+            8 => Some(Self::Rain),
+            9 => Some(Self::HeavyRain),
+            10 => Some(Self::FreezingRain),
+            11 => Some(Self::HeavyFreezingRain),
+            12 => Some(Self::Sleet),
+            13 => Some(Self::HeavySleet),
+            14 => Some(Self::LightSnowfall),
+            15 => Some(Self::Snowfall),
+            16 => Some(Self::HeavySnowfall),
+            17 => Some(Self::RainShower),
+            18 => Some(Self::HeavyRainShower),
+            19 => Some(Self::SleetShower),
+            20 => Some(Self::HeavySleetShower),
+            21 => Some(Self::SnowShower),
+            22 => Some(Self::HeavySnowShower),
+            23 => Some(Self::Lightning),
+            24 => Some(Self::Hail),
+            25 => Some(Self::Thunderstorm),
+            26 => Some(Self::HeavyThunderstorm),
+            27 => Some(Self::Storm),
             _ => None, // Return None for invalid values (including 0)
         }
     }

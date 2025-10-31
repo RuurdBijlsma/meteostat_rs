@@ -148,6 +148,6 @@ impl PointDistance for Station {
         let dx = self.location.latitude - point[0];
         let dy = self.location.longitude - point[1];
         // Returns the squared Euclidean distance
-        dx * dx + dy * dy
+        dx.mul_add(dx, dy * dy)
     }
 }

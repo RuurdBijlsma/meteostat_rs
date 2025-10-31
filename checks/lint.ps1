@@ -44,9 +44,6 @@ $env:RUSTFLAGS = "-Dwarnings"
 $checksPassed = $true
 
 try {
-    # Build
-    cargo build --all-targets --all-features
-
     # Format check
     Write-Host "`n=== Checking formatting with rustfmt ===" -ForegroundColor Cyan
     cargo fmt --all
@@ -55,11 +52,16 @@ try {
         $checksPassed = $false
     }
 
+    # Build
+    Write-Host "`n=== Build ===" -ForegroundColor Cyan
+    cargo build --all-targets --all-features
+
     # Clippy check
     Write-Host "`n=== Running Clippy checks ===" -ForegroundColor Cyan
-    cargo clippy --all-targets --all-features -- -D warnings `
-        -A clippy::missing_errors_doc `
-        -A clippy::missing_panics_doc
+    cargo clippy --all-features -- `
+        -D warnings -W clippy::pedantic `
+        -W clippy::nursery -W rust-2018-idioms `
+        -A clippy::single-match-else
     if ($LASTEXITCODE -ne 0) {
         $checksPassed = $false
     }

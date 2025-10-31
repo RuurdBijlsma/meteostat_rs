@@ -21,33 +21,33 @@ pub enum Frequency {
 }
 
 impl Frequency {
-    pub(crate) fn path_segment(&self) -> &'static str {
+    pub(crate) const fn path_segment(self) -> &'static str {
         match self {
-            Frequency::Hourly => "hourly",
-            Frequency::Daily => "daily",
-            Frequency::Monthly => "monthly",
-            Frequency::Climate => "normals",
+            Self::Hourly => "hourly",
+            Self::Daily => "daily",
+            Self::Monthly => "monthly",
+            Self::Climate => "normals",
         }
     }
 
-    pub(crate) fn cache_file_prefix(&self) -> String {
+    pub(crate) fn cache_file_prefix(self) -> String {
         format!("{}-", self.path_segment())
     }
 
-    pub(crate) fn get_schema_column_names(&self) -> Vec<&'static str> {
+    pub(crate) fn get_schema_column_names(self) -> Vec<&'static str> {
         match self {
-            Frequency::Hourly => vec![
+            Self::Hourly => vec![
                 "date", "hour", "temp", "dwpt", "rhum", "prcp", "snow", "wdir", "wspd", "wpgt",
                 "pres", "tsun", "coco",
             ],
-            Frequency::Daily => vec![
+            Self::Daily => vec![
                 "date", "tavg", "tmin", "tmax", "prcp", "snow", "wdir", "wspd", "wpgt", "pres",
                 "tsun",
             ],
-            Frequency::Monthly => vec![
+            Self::Monthly => vec![
                 "year", "month", "tavg", "tmin", "tmax", "prcp", "wspd", "pres", "tsun",
             ],
-            Frequency::Climate => vec![
+            Self::Climate => vec![
                 "start_year",
                 "end_year",
                 "month",
@@ -126,12 +126,12 @@ pub enum RequiredData {
 
 impl RequiredData {
     #[allow(dead_code)]
-    pub(crate) fn get_end_date(&self) -> Option<NaiveDate> {
+    pub(crate) const fn get_end_date(&self) -> Option<NaiveDate> {
         match self {
-            RequiredData::Any => None,
-            RequiredData::SpecificDate(date) => Some(*date),
-            RequiredData::DateRange { start: _, end } => Some(*end),
-            RequiredData::FullYear(year) => NaiveDate::from_ymd_opt(*year, 12, 31),
+            Self::Any => None,
+            Self::SpecificDate(date) => Some(*date),
+            Self::DateRange { start: _, end } => Some(*end),
+            Self::FullYear(year) => NaiveDate::from_ymd_opt(*year, 12, 31),
         }
     }
 }

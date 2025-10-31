@@ -5,11 +5,13 @@ use std::fmt::{Display, Formatter};
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Ord, PartialOrd, Hash)]
 pub struct Year(pub i32);
 impl Year {
-    pub fn get(self) -> i32 {
+    #[must_use]
+    pub const fn get(self) -> i32 {
         self.0
     }
 
-    pub fn is_leap(self) -> bool {
+    #[must_use]
+    pub const fn is_leap(self) -> bool {
         // Try to create Feb 29; if it exists, it's a leap year
         NaiveDate::from_ymd_opt(self.0, 2, 29).is_some()
     }
@@ -24,13 +26,16 @@ impl Display for Year {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Ord, PartialOrd, Hash)]
 pub struct Month(pub i32, pub u32);
 impl Month {
-    pub fn year(self) -> i32 {
+    #[must_use]
+    pub const fn year(self) -> i32 {
         self.0
     }
-    pub fn month(self) -> u32 {
+    #[must_use]
+    pub const fn month(self) -> u32 {
         self.1
     }
-    pub fn new(month: u32, year: i32) -> Self {
+    #[must_use]
+    pub const fn new(month: u32, year: i32) -> Self {
         Self(year, month)
     }
 }

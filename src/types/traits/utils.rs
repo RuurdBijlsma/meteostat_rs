@@ -1,6 +1,6 @@
 use chrono::{Datelike, Duration, NaiveDate};
 
-pub(crate) fn days_in_month(year: i32, month: u32) -> Option<u32> {
+pub fn days_in_month(year: i32, month: u32) -> Option<u32> {
     if !(1..=12).contains(&month) {
         return None;
     }
