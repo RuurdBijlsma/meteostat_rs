@@ -60,7 +60,7 @@ pub struct Daily {
 /// data fetching or station lookup fails.
 #[derive(Clone)]
 pub struct DailyLazyFrame {
-    /// The underlying Polars LazyFrame containing the daily data.
+    /// The underlying Polars `LazyFrame` containing the daily data.
     pub frame: LazyFrame,
 }
 
@@ -73,7 +73,7 @@ impl DailyLazyFrame {
     ///
     /// * `frame` - A `LazyFrame` assumed to contain daily weather data with the expected schema,
     ///   including a "date" column of type `DataType::Date`.
-    pub(crate) fn new(frame: LazyFrame) -> Self {
+    pub(crate) const fn new(frame: LazyFrame) -> Self {
         Self { frame }
     }
 
@@ -118,8 +118,9 @@ impl DailyLazyFrame {
     ///
     /// While this method itself doesn't typically error, subsequent operations like `.collect()`
     /// might return a [`polars::prelude::PolarsError`].
-    pub fn filter(&self, predicate: Expr) -> DailyLazyFrame {
-        DailyLazyFrame::new(self.frame.clone().filter(predicate))
+    #[must_use]
+    pub fn filter(&self, predicate: Expr) -> Self {
+        Self::new(self.frame.clone().filter(predicate))
     }
 
     /// Filters the daily data to include only dates within the specified range (inclusive).
@@ -135,13 +136,17 @@ impl DailyLazyFrame {
     ///
     /// # Returns
     ///
-    /// A `Result` containing a new `DailyLazyFrame` filtered by the date range,
-    /// or a [`MeteostatError::DateParsingError`] if the date conversion fails.
+    /// A `Result` containing a new `DailyLazyFrame` filtered by the date range.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MeteostatError::DateParsingError`] if the start or end date boundaries
+    /// cannot be resolved into a valid `NaiveDate`.
     pub fn get_range(
         &self,
         start: impl AnyDate,
         end: impl AnyDate,
-    ) -> Result<DailyLazyFrame, MeteostatError> {
+    ) -> Result<Self, MeteostatError> {
         let start_naive = start
             .get_date_range()
             .ok_or(MeteostatError::DateParsingError)?
@@ -171,10 +176,14 @@ impl DailyLazyFrame {
     ///
     /// # Returns
     ///
-    /// A `Result` containing a new `DailyLazyFrame` filtered to the specific date,
-    /// or a [`MeteostatError::DateParsingError`] if the date conversion fails. Collecting
+    /// A `Result` containing a new `DailyLazyFrame` filtered to the specific date. Collecting
     /// the frame should yield zero or one row.
-    pub fn get_at(&self, date: impl AnyDate) -> Result<DailyLazyFrame, MeteostatError> {
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MeteostatError::DateParsingError`] if the input date cannot be
+    /// resolved into a valid `NaiveDate`.
+    pub fn get_at(&self, date: impl AnyDate) -> Result<Self, MeteostatError> {
         // Use the start of the range provided by AnyDate for the equality check
         let naive_date = date
             .get_date_range()
@@ -195,12 +204,13 @@ impl DailyLazyFrame {
     ///
     /// # Returns
     ///
-    /// A `Result` containing a new `DailyLazyFrame` filtered by the period's date range,
-    /// or a [`MeteostatError::DateParsingError`] if the period cannot be resolved.
-    pub fn get_for_period(
-        &self,
-        period: impl DatePeriod,
-    ) -> Result<DailyLazyFrame, MeteostatError> {
+    /// A `Result` containing a new `DailyLazyFrame` filtered by the period's date range.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MeteostatError::DateParsingError`] if the given period cannot be
+    /// resolved into a valid start and end `NaiveDate`.
+    pub fn get_for_period(&self, period: impl DatePeriod) -> Result<Self, MeteostatError> {
         let date_period = period
             .get_date_period()
             .ok_or(MeteostatError::DateParsingError)?;
@@ -217,7 +227,14 @@ impl DailyLazyFrame {
     /// # Returns
     ///
     /// A `Result` containing a `Vec<Daily>` on success, or a [`MeteostatError`]
-    /// if the computation or mapping fails (e.g., `MeteostatError::PolarsError`).
+    /// if the computation or mapping fails.
+    ///
+    /// # Errors
+    ///
+    /// This method can return a [`MeteostatError::PolarsError`] in two main scenarios:
+    /// 1.  The lazy computation fails when `.collect()` is called on the `LazyFrame`.
+    /// 2.  The resulting `DataFrame` does not have the expected schema (e.g., a required
+    ///     column is missing or has an incorrect data type for conversion).
     ///
     /// # Example
     ///
@@ -270,10 +287,10 @@ impl DailyLazyFrame {
     ///
     /// # Errors
     ///
-    /// Returns [`MeteostatError::ExpectedSingleRow`] if the collected `DataFrame` does not
-    /// contain exactly one row.
-    /// Returns [`MeteostatError::PolarsError`] if the computation fails.
-    /// Returns other potential mapping errors if the single row cannot be converted.
+    /// *   Returns [`MeteostatError::ExpectedSingleRow`] if the collected `DataFrame` does not
+    ///     contain exactly one row.
+    /// *   Returns [`MeteostatError::PolarsError`] if the lazy computation fails or if the
+    ///     resulting `DataFrame` has an unexpected schema (missing columns or wrong data types).
     ///
     /// # Example
     ///
@@ -366,7 +383,7 @@ impl DailyLazyFrame {
             // Get date (essential) - skip row if missing/invalid
             let date_opt: Option<NaiveDate> = date_ca
                 .get(i)
-                .map(|days_since_epoch| epoch_date + Duration::days(days_since_epoch as i64));
+                .map(|days_since_epoch| epoch_date + Duration::days(i64::from(days_since_epoch)));
 
             let Some(date) = date_opt else {
                 // Skip row if date is missing or invalid

@@ -52,7 +52,7 @@ pub struct Climate {
 /// data fetching or station lookup fails.
 #[derive(Clone)]
 pub struct ClimateLazyFrame {
-    /// The underlying Polars LazyFrame containing the climate data.
+    /// The underlying Polars `LazyFrame` containing the climate data.
     pub frame: LazyFrame,
 }
 
@@ -64,9 +64,9 @@ impl ClimateLazyFrame {
     /// # Arguments
     ///
     /// * `frame` - A `LazyFrame` assumed to contain climate data with the expected schema
-    ///   (columns like "start_year", "end_year", "month", "tmin", etc.). Year and month
+    ///   (columns like "`start_year`", "`end_year`", "month", "tmin", etc.). Year and month
     ///   columns are expected to be numerical (like Int64).
-    pub(crate) fn new(frame: LazyFrame) -> Self {
+    pub(crate) const fn new(frame: LazyFrame) -> Self {
         Self { frame }
     }
 
@@ -112,8 +112,9 @@ impl ClimateLazyFrame {
     ///
     /// While this method itself doesn't typically error, subsequent operations like `.collect()`
     /// might return a [`polars::prelude::PolarsError`].
-    pub fn filter(&self, predicate: Expr) -> ClimateLazyFrame {
-        ClimateLazyFrame {
+    #[must_use]
+    pub fn filter(&self, predicate: Expr) -> Self {
+        Self {
             frame: self.frame.clone().filter(predicate),
         }
     }
@@ -165,12 +166,13 @@ impl ClimateLazyFrame {
     /// # Errors
     ///
     /// May eventually lead to a [`polars::prelude::PolarsError`] during computation (e.g., `.collect()`).
-    pub fn get_at(&self, start_year: Year, end_year: Year, month: u32) -> ClimateLazyFrame {
+    #[must_use]
+    pub fn get_at(&self, start_year: Year, end_year: Year, month: u32) -> Self {
         self.filter(
             col("start_year")
-                .eq(lit(start_year.get() as i64)) // Match i64 column type
-                .and(col("end_year").eq(lit(end_year.get() as i64))) // Match i64 column type
-                .and(col("month").eq(lit(month as i64))), // Match i64 column type
+                .eq(lit(i64::from(start_year.get()))) // Match i64 column type
+                .and(col("end_year").eq(lit(i64::from(end_year.get())))) // Match i64 column type
+                .and(col("month").eq(lit(i64::from(month)))), // Match i64 column type
         )
     }
 
@@ -178,13 +180,20 @@ impl ClimateLazyFrame {
     ///
     /// This method triggers the computation defined by the `LazyFrame` (including any
     /// previous filtering operations) and maps each resulting row to a `Climate` struct.
-    /// Rows where the essential 'start_year', 'end_year', or 'month' columns are missing
+    /// Rows where the essential '`start_year`', '`end_year`', or 'month' columns are missing
     /// or invalid are skipped.
     ///
     /// # Returns
     ///
     /// A `Result` containing a `Vec<Climate>` on success, or a [`MeteostatError`]
-    /// if the computation or mapping fails (e.g., `MeteostatError::PolarsError`).
+    /// if the computation or mapping fails.
+    ///
+    /// # Errors
+    ///
+    /// This method can return a [`MeteostatError::PolarsError`] in two main scenarios:
+    /// 1.  The lazy computation fails when `.collect()` is called on the `LazyFrame`.
+    /// 2.  The resulting `DataFrame` does not have the expected schema (e.g., a required
+    ///     column is missing or has an incorrect data type for conversion).
     ///
     /// # Example
     ///
@@ -234,10 +243,10 @@ impl ClimateLazyFrame {
     ///
     /// # Errors
     ///
-    /// Returns [`MeteostatError::ExpectedSingleRow`] if the collected `DataFrame` does not
-    /// contain exactly one row.
-    /// Returns [`MeteostatError::PolarsError`] if the computation fails.
-    /// Returns other potential mapping errors if the single row cannot be converted.
+    /// *   Returns [`MeteostatError::ExpectedSingleRow`] if the collected `DataFrame` does not
+    ///     contain exactly one row.
+    /// *   Returns [`MeteostatError::PolarsError`] if the lazy computation fails or if the
+    ///     resulting `DataFrame` has an unexpected schema (missing columns or wrong data types).
     ///
     /// # Example
     ///

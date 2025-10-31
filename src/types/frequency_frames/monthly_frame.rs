@@ -7,7 +7,6 @@ use crate::types::traits::period::month_period::MonthPeriod;
 use crate::MeteostatError;
 use polars::prelude::{col, lit, DataFrame, Expr, LazyFrame};
 use serde::{Deserialize, Serialize};
-// Added DataFrame
 
 /// Represents a row of monthly weather data, suitable for collecting results.
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -56,7 +55,7 @@ pub struct Monthly {
 /// data fetching or station lookup fails.
 #[derive(Clone)]
 pub struct MonthlyLazyFrame {
-    /// The underlying Polars LazyFrame containing the monthly data.
+    /// The underlying Polars `LazyFrame` containing the monthly data.
     pub frame: LazyFrame,
 }
 
@@ -70,7 +69,7 @@ impl MonthlyLazyFrame {
     /// * `frame` - A `LazyFrame` assumed to contain monthly weather data with the expected schema
     ///   (columns like "year", "month", "tavg", "prcp", etc.). Year and Month are expected
     ///   to be numerical types (like Int64).
-    pub(crate) fn new(frame: LazyFrame) -> Self {
+    pub(crate) const fn new(frame: LazyFrame) -> Self {
         Self { frame }
     }
 
@@ -115,8 +114,9 @@ impl MonthlyLazyFrame {
     ///
     /// While this method itself doesn't typically error, subsequent operations like `.collect()`
     /// might return a [`polars::prelude::PolarsError`].
-    pub fn filter(&self, predicate: Expr) -> MonthlyLazyFrame {
-        MonthlyLazyFrame::new(self.frame.clone().filter(predicate))
+    #[must_use]
+    pub fn filter(&self, predicate: Expr) -> Self {
+        Self::new(self.frame.clone().filter(predicate))
     }
 
     /// Filters the monthly data to include only records within the specified month range (inclusive).
@@ -134,13 +134,17 @@ impl MonthlyLazyFrame {
     ///
     /// # Returns
     ///
-    /// A `Result` containing a new `MonthlyLazyFrame` filtered by the month range,
-    /// or a [`MeteostatError::DateParsingError`] if the month conversion fails.
+    /// A `Result` containing a new `MonthlyLazyFrame` filtered by the month range.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MeteostatError::DateParsingError`] if the start or end month boundaries
+    /// cannot be resolved into a valid year and month.
     pub fn get_range(
         &self,
         start: impl AnyMonth,
         end: impl AnyMonth,
-    ) -> Result<MonthlyLazyFrame, MeteostatError> {
+    ) -> Result<Self, MeteostatError> {
         // Resolve inputs to start and end Months
         let start_month_obj = start
             .get_month_range()
@@ -152,10 +156,10 @@ impl MonthlyLazyFrame {
             .end;
 
         // Use i64 literals for comparison as Polars often reads CSV integers as i64
-        let start_year = start_month_obj.year() as i64;
-        let end_year = end_month_obj.year() as i64;
-        let start_month_num = start_month_obj.month() as i64;
-        let end_month_num = end_month_obj.month() as i64;
+        let start_year = i64::from(start_month_obj.year());
+        let end_year = i64::from(end_month_obj.year());
+        let start_month_num = i64::from(start_month_obj.month());
+        let end_month_num = i64::from(end_month_obj.month());
 
         // Build the filter expression
         // Condition: (year > start_year) OR (year == start_year AND month >= start_month_num)
@@ -186,10 +190,14 @@ impl MonthlyLazyFrame {
     ///
     /// # Returns
     ///
-    /// A `Result` containing a new `MonthlyLazyFrame` filtered to the specific year and month,
-    /// or a [`MeteostatError::DateParsingError`] if the conversion fails. Collecting
+    /// A `Result` containing a new `MonthlyLazyFrame` filtered to the specific year and month. Collecting
     /// the frame should yield zero or one row.
-    pub fn get_at(&self, month_spec: impl AnyMonth) -> Result<MonthlyLazyFrame, MeteostatError> {
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MeteostatError::DateParsingError`] if the input cannot be resolved
+    /// into a valid year and month.
+    pub fn get_at(&self, month_spec: impl AnyMonth) -> Result<Self, MeteostatError> {
         // Use the start of the range provided by AnyMonth for the equality check
         let month_obj = month_spec
             .get_month_range()
@@ -197,8 +205,8 @@ impl MonthlyLazyFrame {
             .start;
 
         // Use i64 literals for comparison
-        let target_year = month_obj.year() as i64;
-        let target_month_num = month_obj.month() as i64;
+        let target_year = i64::from(month_obj.year());
+        let target_month_num = i64::from(month_obj.month());
 
         Ok(self.filter(
             col("year")
@@ -219,12 +227,13 @@ impl MonthlyLazyFrame {
     ///
     /// # Returns
     ///
-    /// A `Result` containing a new `MonthlyLazyFrame` filtered by the period's month range,
-    /// or a [`MeteostatError::DateParsingError`] if the period cannot be resolved.
-    pub fn get_for_period(
-        &self,
-        period: impl MonthPeriod,
-    ) -> Result<MonthlyLazyFrame, MeteostatError> {
+    /// A `Result` containing a new `MonthlyLazyFrame` filtered by the period's month range.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MeteostatError::DateParsingError`] if the given period cannot be
+    /// resolved into a valid start and end month.
+    pub fn get_for_period(&self, period: impl MonthPeriod) -> Result<Self, MeteostatError> {
         let month_period = period
             .get_month_period()
             .ok_or(MeteostatError::DateParsingError)?;
@@ -240,8 +249,14 @@ impl MonthlyLazyFrame {
     ///
     /// # Returns
     ///
-    /// A `Result` containing a `Vec<Monthly>` on success, or a [`MeteostatError`]
-    /// if the computation or mapping fails (e.g., `MeteostatError::PolarsError`).
+    /// A `Result` containing a `Vec<Monthly>` on success.
+    ///
+    /// # Errors
+    ///
+    /// This method can return a [`MeteostatError::PolarsError`] in two main scenarios:
+    /// 1.  The lazy computation fails when `.collect()` is called on the `LazyFrame`.
+    /// 2.  The resulting `DataFrame` does not have the expected schema (e.g., a required
+    ///     column is missing or has an incorrect data type for conversion).
     ///
     /// # Example
     ///
@@ -294,10 +309,10 @@ impl MonthlyLazyFrame {
     ///
     /// # Errors
     ///
-    /// Returns [`MeteostatError::ExpectedSingleRow`] if the collected `DataFrame` does not
-    /// contain exactly one row.
-    /// Returns [`MeteostatError::PolarsError`] if the computation fails.
-    /// Returns other potential mapping errors if the single row cannot be converted.
+    /// *   Returns [`MeteostatError::ExpectedSingleRow`] if the collected `DataFrame` does not
+    ///     contain exactly one row.
+    /// *   Returns [`MeteostatError::PolarsError`] if the lazy computation fails or if the
+    ///     resulting `DataFrame` has an unexpected schema (missing columns or wrong data types).
     ///
     /// # Example
     ///

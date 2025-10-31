@@ -1,3 +1,4 @@
+#![allow(clippy::too_many_lines)]
 //! Provides a Rust interface for accessing historical weather and climate data
 //! from [Meteostat](https://meteostat.net/), using their free bulk data interface.
 //!
@@ -73,7 +74,7 @@
 //! *   **[`Meteostat`]:** The main entry point client struct. Created via [`Meteostat::new`] or [`Meteostat::with_cache_folder`].
 //! *   **Frequency Clients:** Accessed via methods on `Meteostat` (e.g., [`Meteostat::hourly`], [`Meteostat::daily`]). These return builders.
 //! *   **Source Specification:** Use `.station("ID")` or `.location(LatLon)` on the frequency client builders.
-//! *   **LazyFrame Wrappers:** Fetching data returns structs like [`HourlyLazyFrame`], [`DailyLazyFrame`], [`MonthlyLazyFrame`], [`ClimateLazyFrame`] which contain a Polars `LazyFrame` and provide convenience filtering and collection methods.
+//! *   **`LazyFrame` Wrappers:** Fetching data returns structs like [`HourlyLazyFrame`], [`DailyLazyFrame`], [`MonthlyLazyFrame`], [`ClimateLazyFrame`] which contain a Polars `LazyFrame` and provide convenience filtering and collection methods.
 //! *   **Filtering:** Use methods like `get_range`, `get_at`, `get_for_period` on the frame wrappers, or access `.frame` for advanced Polars operations.
 //! *   **Collecting:** Call `.frame.collect()?` on the frame wrappers to execute the query and get a `DataFrame`, OR use specific methods like `.collect_daily()`, `.collect_single_hourly()`, etc., to get results directly as Rust structs (e.g., `Vec<Daily>`, `Hourly`).
 //! *   **Finding Stations:** Use [`Meteostat::find_stations`] to search for [`Station`] objects near a [`LatLon`], optionally filtering by [`InventoryRequest`] criteria.

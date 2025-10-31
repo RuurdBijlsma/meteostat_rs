@@ -72,7 +72,7 @@ pub struct Hourly {
 /// data fetching or station lookup fails.
 #[derive(Clone)]
 pub struct HourlyLazyFrame {
-    /// The underlying Polars LazyFrame containing the hourly data.
+    /// The underlying Polars `LazyFrame` containing the hourly data.
     pub frame: LazyFrame,
 }
 
@@ -85,7 +85,7 @@ impl HourlyLazyFrame {
     ///
     /// * `frame` - A `LazyFrame` assumed to contain hourly weather data with the expected schema,
     ///   including a "datetime" column interpretable as timezone-naive UTC.
-    pub(crate) fn new(frame: LazyFrame) -> Self {
+    pub(crate) const fn new(frame: LazyFrame) -> Self {
         Self { frame }
     }
 
@@ -130,11 +130,11 @@ impl HourlyLazyFrame {
     ///
     /// While this method itself doesn't typically error, subsequent operations like `.collect()`
     /// might return a [`polars::prelude::PolarsError`].
-    pub fn filter(&self, predicate: Expr) -> HourlyLazyFrame {
-        HourlyLazyFrame::new(self.frame.clone().filter(predicate))
+    #[must_use]
+    pub fn filter(&self, predicate: Expr) -> Self {
+        Self::new(self.frame.clone().filter(predicate))
     }
 
-    // ... [ get_range, get_at, get_for_period methods remain unchanged ] ...
     /// Filters the hourly data to include only records within the specified datetime range (inclusive).
     ///
     /// The `start` and `end` arguments can be any type that implements [`AnyDateTime`],
@@ -149,13 +149,17 @@ impl HourlyLazyFrame {
     ///
     /// # Returns
     ///
-    /// A `Result` containing a new `HourlyLazyFrame` filtered by the datetime range,
-    /// or a [`MeteostatError::DateParsingError`] if the datetime conversion fails.
+    /// A `Result` containing a new `HourlyLazyFrame` filtered by the datetime range.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MeteostatError::DateParsingError`] if the start or end datetime boundaries
+    /// cannot be resolved into a valid `DateTime<Utc>`.
     pub fn get_range(
         &self,
         start: impl AnyDateTime,
         end: impl AnyDateTime,
-    ) -> Result<HourlyLazyFrame, MeteostatError> {
+    ) -> Result<Self, MeteostatError> {
         // Resolve inputs to UTC DateTimes
         let start_utc = start
             .get_datetime_range()
@@ -190,10 +194,19 @@ impl HourlyLazyFrame {
     ///
     /// # Returns
     ///
-    /// A `Result` containing a new `HourlyLazyFrame` filtered to the specific rounded hour,
-    /// or a [`MeteostatError::DateParsingError`] if the datetime conversion fails. Collecting
+    /// A `Result` containing a new `HourlyLazyFrame` filtered to the specific rounded hour. Collecting
     /// the frame should yield zero or one row.
-    pub fn get_at(&self, datetime: impl AnyDateTime) -> Result<HourlyLazyFrame, MeteostatError> {
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MeteostatError::DateParsingError`] if the input datetime cannot be
+    /// resolved into a valid `DateTime<Utc>`.
+    ///
+    /// # Panics
+    ///
+    /// * If the datetime can't be truncated to 0 minutes, 0 seconds, 0 nanoseconds.
+    /// * If the (datetime + 1 hour) can't be truncated to 0 minutes, 0 seconds, 0 nanoseconds.
+    pub fn get_at(&self, datetime: impl AnyDateTime) -> Result<Self, MeteostatError> {
         let date_utc = datetime
             .get_datetime_range()
             .ok_or(MeteostatError::DateParsingError)?
@@ -232,12 +245,13 @@ impl HourlyLazyFrame {
     ///
     /// # Returns
     ///
-    /// A `Result` containing a new `HourlyLazyFrame` filtered by the period's datetime range,
-    /// or a [`MeteostatError::DateParsingError`] if the period cannot be resolved.
-    pub fn get_for_period(
-        &self,
-        period: impl DateTimePeriod,
-    ) -> Result<HourlyLazyFrame, MeteostatError> {
+    /// A `Result` containing a new `HourlyLazyFrame` filtered by the period's datetime range.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MeteostatError::DateParsingError`] if the given period cannot be
+    /// resolved into a valid start and end `DateTime<Utc>`.
+    pub fn get_for_period(&self, period: impl DateTimePeriod) -> Result<Self, MeteostatError> {
         let datetime_period = period
             .get_datetime_period()
             .ok_or(MeteostatError::DateParsingError)?;
@@ -253,8 +267,14 @@ impl HourlyLazyFrame {
     ///
     /// # Returns
     ///
-    /// A `Result` containing a `Vec<Hourly>` on success, or a [`MeteostatError`]
-    /// if the computation or mapping fails (e.g., `MeteostatError::PolarsError`).
+    /// A `Result` containing a `Vec<Hourly>` on success.
+    ///
+    /// # Errors
+    ///
+    /// This method can return a [`MeteostatError::PolarsError`] in two main scenarios:
+    /// 1.  The lazy computation fails when `.collect()` is called on the `LazyFrame`.
+    /// 2.  The resulting `DataFrame` does not have the expected schema (e.g., a required
+    ///     column is missing or has an incorrect data type for conversion).
     ///
     /// # Example
     ///
@@ -307,10 +327,10 @@ impl HourlyLazyFrame {
     ///
     /// # Errors
     ///
-    /// Returns [`MeteostatError::ExpectedSingleRow`] if the collected `DataFrame` does not
-    /// contain exactly one row.
-    /// Returns [`MeteostatError::PolarsError`] if the computation fails.
-    /// Returns other potential mapping errors if the single row cannot be converted.
+    /// *   Returns [`MeteostatError::ExpectedSingleRow`] if the collected `DataFrame` does not
+    ///     contain exactly one row.
+    /// *   Returns [`MeteostatError::PolarsError`] if the lazy computation fails or if the
+    ///     resulting `DataFrame` has an unexpected schema (missing columns or wrong data types).
     ///
     /// # Example
     ///

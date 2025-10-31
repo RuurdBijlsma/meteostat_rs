@@ -35,7 +35,8 @@ impl LatLon {
     pub const fn lat(&self) -> f64 {
         self.0
     }
-    pub fn lon(&self) -> f64 {
+    #[must_use]
+    pub const fn lon(&self) -> f64 {
         self.1
     }
 }
@@ -44,7 +45,7 @@ impl LatLon {
 ///
 /// Used in conjunction with [`Meteostat::find_stations`] to find stations that
 /// report having data for a specific frequency and meeting certain data coverage requirements.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct InventoryRequest {
     /// The required data frequency (e.g., Hourly, Daily).
     frequency: Frequency,
@@ -59,7 +60,8 @@ impl InventoryRequest {
     ///
     /// * `frequency` - The desired data [`Frequency`].
     /// * `required_data` - The [`RequiredData`] criteria for data coverage.
-    pub fn new(frequency: Frequency, required_data: RequiredData) -> Self {
+    #[must_use]
+    pub const fn new(frequency: Frequency, required_data: RequiredData) -> Self {
         Self {
             frequency,
             required_data,
@@ -203,7 +205,7 @@ impl Meteostat {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn hourly(&self) -> HourlyClient<'_> {
+    pub const fn hourly(&self) -> HourlyClient<'_> {
         HourlyClient::new(self)
     }
 
@@ -230,7 +232,7 @@ impl Meteostat {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn daily(&self) -> DailyClient<'_> {
+    pub const fn daily(&self) -> DailyClient<'_> {
         DailyClient::new(self)
     }
 
@@ -257,7 +259,7 @@ impl Meteostat {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn monthly(&self) -> MonthlyClient<'_> {
+    pub const fn monthly(&self) -> MonthlyClient<'_> {
         MonthlyClient::new(self)
     }
 
@@ -283,7 +285,7 @@ impl Meteostat {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn climate(&self) -> ClimateClient<'_> {
+    pub const fn climate(&self) -> ClimateClient<'_> {
         ClimateClient::new(self)
     }
 
@@ -340,20 +342,20 @@ impl Meteostat {
     /// # }
     /// ```
     #[builder]
-    pub async fn find_stations(
+    pub fn find_stations(
         &self,
         location: LatLon,
         inventory_request: Option<InventoryRequest>,
         max_distance_km: Option<f64>,
         station_limit: Option<usize>,
-    ) -> Result<Vec<StationWithDistance>, MeteostatError> {
+    ) -> Vec<StationWithDistance> {
         // Note: The defaults below are applied *if* the corresponding builder method was not called.
         let max_distance_km = max_distance_km.unwrap_or(50.0);
         let station_limit = station_limit.unwrap_or(5); // Default limit for find_stations
 
-        let (freq_option, date_option) = inventory_request
-            .map(|req| (Some(req.frequency), Some(req.required_data))) // Pass Some when inventory_request is Some
-            .unwrap_or((None, None)); // Pass None otherwise
+        let (freq_option, date_option) = inventory_request.map_or((None, None), |req| {
+            (Some(req.frequency), Some(req.required_data))
+        });
 
         // Perform the query using the station locator
         let stations_with_distance = self.station_locator.query(
@@ -366,14 +368,14 @@ impl Meteostat {
         );
 
         // Extract stations and discard distances
-        Ok(stations_with_distance
+        stations_with_distance
             .into_iter()
             .map(|(station, distance)| StationWithDistance {
                 distance_km: distance,
                 station,
                 requested_point: location,
             })
-            .collect())
+            .collect()
     }
 
     /// **Internal:** Fetches a lazy frame for a specific station and frequency.
@@ -472,7 +474,7 @@ impl Meteostat {
         let mut last_error: Option<MeteostatError> = None;
 
         // Iterate through the found stations (sorted by distance) and try to fetch data
-        for (station, _) in stations.iter() {
+        for (station, _) in &stations {
             match self
                 .fetcher
                 .get_cache_lazyframe(&station.id, frequency, required_data.unwrap_or(Any))
@@ -532,7 +534,7 @@ impl Meteostat {
     pub async fn clear_station_list_cache(&self) -> Result<(), MeteostatError> {
         let stations_file = self.cache_folder.join(BINCODE_CACHE_FILE_NAME);
         match tokio::fs::remove_file(&stations_file).await {
-            Ok(_) => Ok(()),
+            Ok(()) => Ok(()),
             Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(()), // Not an error if already gone
             Err(e) => Err(MeteostatError::CacheDeletionError(stations_file.clone(), e)),
         }
@@ -778,7 +780,7 @@ mod tests {
 
         // Ensure station cache exists
         let berlin = berlin_location();
-        let stations = client.find_stations().location(berlin).call().await?;
+        let stations = client.find_stations().location(berlin).call();
         let station_id = &stations.first().unwrap().station.id;
         let _lf = client.hourly().station(station_id).call().await?;
         println!("Found station ID: {}", station_id);
@@ -890,7 +892,7 @@ mod tests {
         let client = Meteostat::new().await?;
         let location = berlin_location();
 
-        let stations = client.find_stations().location(location).call().await?;
+        let stations = client.find_stations().location(location).call();
 
         assert!(!stations.is_empty(), "Should find stations near Berlin");
         // Default limit is 5
@@ -919,8 +921,7 @@ mod tests {
             .find_stations()
             .location(location)
             .station_limit(limit)
-            .call()
-            .await?;
+            .call();
 
         assert!(!stations.is_empty(), "Should find stations near Berlin");
         assert!(
@@ -949,8 +950,7 @@ mod tests {
             .find_stations()
             .location(location)
             .max_distance_km(max_dist)
-            .call()
-            .await?;
+            .call();
 
         // Might still find stations, but possibly fewer than default distance
         println!("Found {} stations within {} km:", stations.len(), max_dist);
@@ -978,8 +978,7 @@ mod tests {
             .find_stations()
             .location(location)
             .inventory_request(inventory_req)
-            .call()
-            .await?;
+            .call();
 
         assert!(
             !stations.is_empty(),
@@ -1013,8 +1012,7 @@ mod tests {
             .find_stations()
             .location(location)
             .max_distance_km(max_dist)
-            .call()
-            .await?;
+            .call();
 
         assert!(
             stations.is_empty(),

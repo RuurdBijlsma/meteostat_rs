@@ -20,7 +20,7 @@ use tokio::io::{AsyncReadExt, BufReader};
 use tokio_util::io::StreamReader;
 
 const DATA_URL: &str = "https://bulk.meteostat.net/v2/stations/lite.json.gz";
-pub(crate) const BINCODE_CACHE_FILE_NAME: &str = "stations_lite.bin";
+pub const BINCODE_CACHE_FILE_NAME: &str = "stations_lite.bin";
 const BINCODE_CONFIG: Configuration<LittleEndian, Fixint> =
     bincode::config::standard().with_fixed_int_encoding();
 
@@ -68,7 +68,7 @@ impl StationLocator {
         }
 
         let rtree = RTree::bulk_load(stations);
-        Ok(StationLocator { rtree })
+        Ok(Self { rtree })
     }
 
     // --- Caching and Fetching methods remain the same ---
@@ -197,14 +197,10 @@ impl StationLocator {
         // and Haversine vs R-tree distance differences.
         let candidate_limit = (n_results * 2).max(20); // Check at least 20 or 2x n_results
 
-        let initial_candidates: Vec<_> = self
+        let mut stations_with_dist: Vec<(Station, f64)> = self
             .rtree
             .nearest_neighbor_iter(&query_point_rtree)
             .take(candidate_limit)
-            .collect();
-
-        let mut stations_with_dist: Vec<(Station, f64)> = initial_candidates
-            .into_iter()
             .filter_map(|station| {
                 // Use filter_map for combined Haversine calc + distance filter
                 let station_loc = HaversineLocation {
@@ -236,7 +232,7 @@ impl StationLocator {
         stations_with_dist
     }
 
-    /// Query using BinaryHeap for filtering, with a heuristic limit on R-Tree iteration.
+    /// Query using `BinaryHeap` for filtering, with a heuristic limit on R-Tree iteration.
     fn filtered_heap_query(
         &self,
         latitude: f64,
@@ -329,10 +325,7 @@ impl StationLocator {
         frequency: Option<Frequency>,
         required_date: Option<&RequiredData>,
     ) -> bool {
-        let freq = match frequency {
-            Some(f) => f,
-            None => return true, // No filter applied
-        };
+        let Some(freq) = frequency else { return true };
         let req_date = required_date.unwrap_or(&RequiredData::Any);
         match freq {
             Frequency::Daily => {
@@ -392,9 +385,9 @@ impl StationLocator {
                 start: req_s,
                 end: req_e,
             } => {
-                let req_s_y = req_s.year();
-                let req_e_y = req_e.year();
-                inv_start_y <= req_s_y && inv_end_y >= req_e_y
+                let req_start_y = req_s.year();
+                let req_end_y = req_e.year();
+                inv_start_y <= req_start_y && inv_end_y >= req_end_y
             }
             RequiredData::FullYear(year) => {
                 let req_y = *year;

@@ -20,9 +20,9 @@ pub struct WeatherDataLoader {
 }
 
 impl WeatherDataLoader {
-    pub fn new(cache_dir: &Path) -> WeatherDataLoader {
+    pub fn new(cache_dir: &Path) -> Self {
         let download_client = Client::new();
-        WeatherDataLoader {
+        Self {
             cache_dir: cache_dir.to_path_buf(),
             download_client,
         }
@@ -76,8 +76,8 @@ impl WeatherDataLoader {
         }
     }
 
-    /// Generic function to load a DataFrame for a given station and data type.
-    /// Handles caching and downloading. Returns a LazyFrame with schema-specific column names and types.
+    /// Generic function to load a `DataFrame` for a given station and data type.
+    /// Handles caching and downloading. Returns a `LazyFrame` with schema-specific column names and types.
     pub async fn get_frame(
         &self,
         data_type: Frequency,
@@ -101,7 +101,7 @@ impl WeatherDataLoader {
             Self::cache_dataframe(df, &parquet_path).await?;
         }
 
-        LazyFrame::scan_parquet(parquet_path.clone(), Default::default())
+        LazyFrame::scan_parquet(parquet_path.clone(), ScanArgsParquet::default())
             .map_err(|e| WeatherDataError::ParquetScan(parquet_path, e))
     }
 
@@ -151,7 +151,7 @@ impl WeatherDataLoader {
         Ok(decompressed)
     }
 
-    /// Parses raw CSV bytes (without header) into a DataFrame using a blocking task.
+    /// Parses raw CSV bytes (without header) into a `DataFrame` using a blocking task.
     /// Assigns correct column names and casts columns to appropriate data types based on Frequency.
     async fn csv_to_dataframe(
         bytes: Vec<u8>,
@@ -226,7 +226,7 @@ impl WeatherDataLoader {
                         // Create datetime first from string date and i64 hour
                         (col("date")
                             .str()
-                            .strptime(DataType::Date, date_options.clone(), lit("raise"))
+                            .strptime(DataType::Date, date_options, lit("raise"))
                             .cast(DataType::Datetime(TimeUnit::Milliseconds, None))
                             + duration(
                                 DurationArgs::new().with_hours(col("hour").cast(DataType::Int64)),
@@ -254,7 +254,7 @@ impl WeatherDataLoader {
                         // Parse date string to Date type
                         col("date")
                             .str()
-                            .strptime(DataType::Date, date_options.clone(), lit("raise"))
+                            .strptime(DataType::Date, date_options, lit("raise"))
                             .alias("date"), // Overwrite original string date column
                         // Cast numerical columns
                         col("tavg").cast(DataType::Float64),
@@ -317,7 +317,7 @@ impl WeatherDataLoader {
                 // Propagate the inner Result<DataFrame, WeatherDataError>
     }
 
-    /// Writes a DataFrame to a Parquet file asynchronously using spawn_blocking.
+    /// Writes a `DataFrame` to a Parquet file asynchronously using `spawn_blocking`.
     async fn cache_dataframe(mut df: DataFrame, path: &Path) -> Result<(), WeatherDataError> {
         let path_buf = path.to_path_buf();
         task::spawn_blocking(move || {
