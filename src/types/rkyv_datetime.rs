@@ -11,10 +11,7 @@ impl rkyv::with::ArchiveWith<Option<NaiveDate>> for ChronoDateOption {
         _resolver: Self::Resolver,
         out: rkyv::Place<Self::Archived>,
     ) {
-        let val = match field {
-            Some(date) => date.num_days_from_ce(),
-            None => 0,
-        };
+        let val = field.as_ref().map_or(0, Datelike::num_days_from_ce);
         out.write(rkyv::rend::i32_le::from_native(val));
     }
 }

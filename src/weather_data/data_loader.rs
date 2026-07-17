@@ -258,7 +258,7 @@ impl WeatherDataLoader {
                         // Create datetime first from string date and i64 hour
                         (col("date")
                             .str()
-                            .strptime(DataType::Date, date_options.clone(), lit("raise"))
+                            .strptime(DataType::Date, date_options, lit("raise"))
                             .cast(DataType::Datetime(TimeUnit::Milliseconds, None))
                             + duration(DurationArgs::new().with_hours(col("hour"))))
                         .alias("datetime"),

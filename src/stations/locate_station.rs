@@ -12,6 +12,7 @@ use rstar::RTree;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use std::fs::remove_file;
+use std::io::Write;
 use std::io::{self};
 use std::path::Path;
 use tokio::io::{AsyncReadExt, BufReader};
@@ -135,7 +136,6 @@ impl StationLocator {
             }
             let mut temp_file = tempfile::NamedTempFile::new_in(parent)
                 .map_err(|e| LocateStationError::CacheWrite(path_buf.clone(), e))?;
-            use std::io::Write;
             temp_file
                 .write_all(&rkyv_data)
                 .map_err(|e| LocateStationError::CacheWrite(path_buf.clone(), e))?;

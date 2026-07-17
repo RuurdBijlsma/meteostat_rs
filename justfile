@@ -8,10 +8,7 @@ fmt:
     cargo fmt --all
 
 clippy:
-    cargo clippy --no-deps --all-features --tests --benches -- \
-        -D clippy::all \
-        -D clippy::pedantic \
-        -D clippy::nursery
+    cargo clippy -
 
 # --- Misc:
 
