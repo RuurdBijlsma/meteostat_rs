@@ -19,7 +19,7 @@ use tokio::io::{AsyncReadExt, BufReader};
 use tokio_util::io::StreamReader;
 
 const DATA_URL: &str = "https://bulk.meteostat.net/v2/stations/lite.json.gz";
-pub const BINCODE_CACHE_FILE_NAME: &str = "stations_lite.bin";
+pub const RKYV_CACHE_FILE_NAME: &str = "stations_lite.rkyv";
 
 #[derive(Debug, Clone)]
 pub struct StationLocator {
@@ -51,7 +51,7 @@ impl Ord for StationCandidate<'_> {
 
 impl StationLocator {
     pub async fn new(cache_dir: &Path) -> Result<Self, LocateStationError> {
-        let cache_file = cache_dir.join(BINCODE_CACHE_FILE_NAME);
+        let cache_file = cache_dir.join(RKYV_CACHE_FILE_NAME);
 
         let stations: Vec<Station>;
 
@@ -160,7 +160,7 @@ impl StationLocator {
 
     /// Clears the cache and rebuilds the rtree from fresh data
     pub async fn rebuild_cache(&mut self, cache_dir: &Path) -> Result<(), LocateStationError> {
-        let cache_file = cache_dir.join(BINCODE_CACHE_FILE_NAME);
+        let cache_file = cache_dir.join(RKYV_CACHE_FILE_NAME);
         if cache_file.exists() {
             remove_file(&cache_file)
                 .map_err(|e| LocateStationError::CacheWrite(cache_file.clone(), e))?;

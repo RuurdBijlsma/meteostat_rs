@@ -4,7 +4,7 @@
 //! different types of weather data (hourly, daily, monthly, climate normals)
 //! either by station ID or by geographical location.
 
-use crate::stations::locate_station::{StationLocator, BINCODE_CACHE_FILE_NAME};
+use crate::stations::locate_station::{StationLocator, RKYV_CACHE_FILE_NAME};
 use crate::types::station::StationWithDistance;
 use crate::utils::{ensure_cache_dir_exists, get_cache_dir};
 use crate::weather_data::frame_fetcher::FrameFetcher;
@@ -531,7 +531,7 @@ impl Meteostat {
     /// # }
     /// ```
     pub async fn clear_station_list_cache(&self) -> Result<(), MeteostatError> {
-        let stations_file = self.cache_folder.join(BINCODE_CACHE_FILE_NAME);
+        let stations_file = self.cache_folder.join(RKYV_CACHE_FILE_NAME);
         match tokio::fs::remove_file(&stations_file).await {
             Ok(()) => Ok(()),
             Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(()), // Not an error if already gone
@@ -833,7 +833,7 @@ mod tests {
         // --- Verify directory is empty except for stations file (sync version) ---
         let mut file_count = 0;
         let mut stations_file_found = false;
-        let stations_filename = OsStr::new(BINCODE_CACHE_FILE_NAME); // Define expected filename
+        let stations_filename = OsStr::new(RKYV_CACHE_FILE_NAME); // Define expected filename
 
         // Iterate through the directory synchronously
         for entry_result in fs::read_dir(&cache_path)? {
