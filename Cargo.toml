@@ -33,16 +33,15 @@ tokio = { version = "1.53.0", features = ["full"] }
 futures-util = "0.3.32"
 tokio-util = { version = "0.7.18", features = ["io", "io-util"] }
 haversine = "0.2.1"
-bincode = { version = "2.0.1", features = ["serde"] }
 rstar = "0.13.0"
 dirs = "6.0.0"
 tempfile = "3.27.0"
 thiserror = "2.0.18"
 bon = "3.9.3"
 ordered-float = "5.3.0"
-rkyv = { version = "0.8.17" }
+rkyv = { version = "0.8.17", features = ["std", "alloc", "bytecheck"] }
 # Only for one of the examples:
-plotlars = { version = "0.12.6", optional = true, features = ["plotly"] }
+plotlars = { version = "0.12.6", optional = true, features = ["plotters"] }
 
 
 [dev-dependencies]

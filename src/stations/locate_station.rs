@@ -3,8 +3,6 @@ use crate::types::frequency::{Frequency, RequiredData};
 use crate::types::station::YearRange;
 use crate::types::station::{DateRange, Station};
 use async_compression::tokio::bufread::GzipDecoder;
-use bincode;
-use bincode::config::{Configuration, Fixint, LittleEndian};
 use chrono::{Datelike, NaiveDate};
 use futures_util::TryStreamExt;
 use haversine::{distance, Location as HaversineLocation, Units};
@@ -21,8 +19,6 @@ use tokio_util::io::StreamReader;
 
 const DATA_URL: &str = "https://bulk.meteostat.net/v2/stations/lite.json.gz";
 pub const BINCODE_CACHE_FILE_NAME: &str = "stations_lite.bin";
-const BINCODE_CONFIG: Configuration<LittleEndian, Fixint> =
-    bincode::config::standard().with_fixed_int_encoding();
 
 #[derive(Debug, Clone)]
 pub struct StationLocator {
@@ -71,14 +67,12 @@ impl StationLocator {
         Ok(Self { rtree })
     }
 
-    // --- Caching and Fetching methods remain the same ---
+    // --- Caching and Fetching methods ---
     fn get_cached_stations(cache_path: &Path) -> Result<Vec<Station>, LocateStationError> {
         let bytes = std::fs::read(cache_path)
             .map_err(|e| LocateStationError::CacheRead(cache_path.to_path_buf(), e))?;
-        let (decoded_stations, _) =
-            bincode::serde::decode_from_slice::<Vec<Station>, _>(&bytes, BINCODE_CONFIG).map_err(
-                |e| LocateStationError::CacheDecode(cache_path.to_path_buf(), Box::from(e)),
-            )?;
+        let decoded_stations = rkyv::from_bytes::<Vec<Station>, rkyv::rancor::Error>(&bytes)
+            .map_err(|e| LocateStationError::CacheDecode(cache_path.to_path_buf(), e))?;
         Ok(decoded_stations)
     }
 
@@ -113,7 +107,7 @@ impl StationLocator {
             serde_json::from_slice::<Vec<Station>>(&decompressed_json)
                 .map_err(LocateStationError::from)
         })
-        .await??;
+            .await??;
         Ok(stations)
     }
 
@@ -121,14 +115,14 @@ impl StationLocator {
         stations: Vec<Station>,
         cache_path: &Path,
     ) -> Result<(), LocateStationError> {
-        let bincode_data = tokio::task::spawn_blocking({
+        let rkyv_data = tokio::task::spawn_blocking({
             move || {
-                bincode::serde::encode_to_vec(stations, BINCODE_CONFIG)
-                    .map_err(|e| LocateStationError::CacheEncode(Box::new(e)))
+                rkyv::to_bytes::<rkyv::rancor::Error>(&stations)
+                    .map_err(LocateStationError::CacheEncode)
             }
         })
-        .await??;
-        tokio::fs::write(&cache_path, &bincode_data)
+            .await??;
+        tokio::fs::write(&cache_path, &rkyv_data)
             .await
             .map_err(|e| LocateStationError::CacheWrite(cache_path.to_path_buf(), e))?;
         Ok(())
@@ -319,7 +313,7 @@ impl StationLocator {
         results
     }
 
-    // --- Inventory check helpers remain the same ---
+    // --- Inventory check helpers ---
     fn station_meets_criteria(
         station: &Station,
         frequency: Option<Frequency>,
@@ -403,11 +397,9 @@ mod tests {
     use super::*;
     use crate::types::frequency::{Frequency, RequiredData};
     use crate::types::station::Station;
-    // Make sure get_cache_dir is available or replace with hardcoded path for tests
     use crate::utils::get_cache_dir;
     use chrono::{Datelike, NaiveDate};
 
-    // Helper to get a StationLocator instance, handles caching
     async fn get_locator() -> Result<StationLocator, LocateStationError> {
         let cache_path = get_cache_dir().expect("Failed to get cache dir for tests");
         tokio::fs::create_dir_all(&cache_path)
@@ -418,14 +410,10 @@ mod tests {
             .expect("Failed to initialize StationLocator"))
     }
 
-    // Helper to validate basic query results (consider adding back criteria check)
     fn validate_results(
         results: &[(Station, f64)],
         expected_max_len: usize,
         max_distance_km: f64,
-        // You might want to pass frequency/required_date back in for deeper validation
-        // frequency: Option<Frequency>,
-        // required_date: Option<RequiredDate>,
     ) {
         assert!(
             results.len() <= expected_max_len,
@@ -452,12 +440,9 @@ mod tests {
                 last_dist
             );
             last_dist = *dist;
-            // Add criteria check back if needed:
-            // assert!(StationLocator::station_meets_criteria(station, frequency, required_date.as_ref()), "Station {} failed criteria", station.id);
         }
     }
 
-    // --- Individual test cases remain largely the same, calling locator.query(...) ---
     #[tokio::test(flavor = "multi_thread")]
     async fn test_basic_query_no_filters() -> Result<(), LocateStationError> {
         let locator = get_locator().await?;
@@ -492,7 +477,6 @@ mod tests {
             max_d
         );
         validate_results(&results, n, max_d);
-        // Add specific check for Daily data if desired
         for (s, _) in &results {
             assert!(s.inventory.daily.start.is_some());
         }
@@ -517,7 +501,6 @@ mod tests {
             max_d
         );
         validate_results(&results, n, max_d);
-        // Add specific check for date inclusion if desired
         for (s, _) in &results {
             let inv = &s.inventory.hourly;
             assert!(
@@ -552,7 +535,6 @@ mod tests {
             max_d
         );
         validate_results(&results, n, max_d);
-        // Add specific check for year range containment if desired
         for (s, _) in &results {
             let inv = &s.inventory.monthly;
             assert!(
@@ -635,7 +617,6 @@ mod tests {
             max_d
         );
         validate_results(&results, n, max_d);
-        // Most likely empty, validation inside validate_results covers correctness if not empty
         Ok(())
     }
 }

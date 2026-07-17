@@ -3,10 +3,58 @@
 //! necessary for spatial indexing using the `rstar` crate.
 
 use crate::LatLon;
-use chrono::NaiveDate;
+use chrono::{Datelike, NaiveDate};
+use rkyv::{Archive, Serialize as ArchiveSerialize, Deserialize as ArchiveDeserialize};
 use rstar::{PointDistance, RTreeObject, AABB};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+// Custom rkyv translation wrapper for chrono::NaiveDate
+pub struct NaiveDateAsDays;
+
+impl rkyv::with::ArchiveWith<chrono::NaiveDate> for NaiveDateAsDays {
+    type Archived = rkyv::Archived<i32>;
+    type Resolver = rkyv::Resolver<i32>;
+
+    fn resolve_with(
+        field: &chrono::NaiveDate,
+        resolver: Self::Resolver,
+        out: rkyv::Place<Self::Archived>,
+    ) {
+        let days = field.num_days_from_ce();
+        rkyv::Archive::resolve(&days, resolver, out);
+    }
+}
+
+impl<S: rkyv::rancor::Fallible + ?Sized> rkyv::with::SerializeWith<chrono::NaiveDate, S> for NaiveDateAsDays
+where
+    i32: rkyv::Serialize<S>,
+{
+    fn serialize_with(
+        field: &chrono::NaiveDate,
+        serializer: &mut S,
+    ) -> Result<Self::Resolver, S::Error> {
+        let days = field.num_days_from_ce();
+        rkyv::Serialize::serialize(&days, serializer)
+    }
+}
+
+impl<D: rkyv::rancor::Fallible + ?Sized> rkyv::with::DeserializeWith<rkyv::Archived<i32>, chrono::NaiveDate, D>
+for NaiveDateAsDays
+where
+    rkyv::Archived<i32>: rkyv::Deserialize<i32, D>,
+{
+    fn deserialize_with(
+        field: &rkyv::Archived<i32>,
+        deserializer: &mut D,
+    ) -> Result<chrono::NaiveDate, D::Error> {
+        let days = rkyv::Deserialize::deserialize(field, deserializer)?;
+        Ok(chrono::NaiveDate::from_num_days_from_ce_opt(days).unwrap_or_else(|| {
+            chrono::NaiveDate::from_ymd_opt(1970, 1, 1).unwrap()
+        }))
+    }
+}
+
 // --- Data Structures ---
 
 /// Links a station with a distance to a point.
@@ -24,6 +72,7 @@ pub struct StationWithDistance {
 /// geographical location, and data availability (inventory).
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
+#[derive(Archive, ArchiveSerialize, ArchiveDeserialize)]
 pub struct Station {
     /// The unique Meteostat station identifier (e.g., "10637").
     pub id: String,
@@ -49,6 +98,7 @@ pub struct Station {
 /// to be available according to Meteostat's metadata. Note that gaps might exist
 /// within these ranges.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Archive, ArchiveSerialize, ArchiveDeserialize)]
 pub struct Inventory {
     /// The reported start and end dates for daily data.
     pub daily: DateRange,
@@ -66,10 +116,13 @@ pub struct Inventory {
 ///
 /// Used within [`Inventory`] for frequencies where day-level precision is relevant (daily, hourly).
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Archive, ArchiveSerialize, ArchiveDeserialize)]
 pub struct DateRange {
     /// The earliest date for which data is reported available, if known.
+    #[rkyv(with = rkyv::with::Map<NaiveDateAsDays>)]
     pub start: Option<NaiveDate>,
     /// The latest date for which data is reported available, if known.
+    #[rkyv(with = rkyv::with::Map<NaiveDateAsDays>)]
     pub end: Option<NaiveDate>,
 }
 
@@ -77,6 +130,7 @@ pub struct DateRange {
 ///
 /// Used within [`Inventory`] for frequencies where year-level precision is sufficient (monthly, climate normals).
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
+#[derive(Archive, ArchiveSerialize, ArchiveDeserialize)]
 pub struct YearRange {
     /// The earliest year for which data is reported available, if known.
     pub start: Option<i32>,
@@ -86,6 +140,7 @@ pub struct YearRange {
 
 /// Holds various alternative identifiers that might be associated with a weather station.
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
+#[derive(Archive, ArchiveSerialize, ArchiveDeserialize)]
 pub struct Identifiers {
     /// National station identifier, if available.
     pub national: Option<String>,
@@ -97,6 +152,7 @@ pub struct Identifiers {
 
 /// Represents the geographical location of a weather station.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Archive, ArchiveSerialize, ArchiveDeserialize)]
 pub struct StationLocation {
     /// Latitude in decimal degrees (positive for North, negative for South).
     pub latitude: f64,
