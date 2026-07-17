@@ -16,10 +16,10 @@ pub enum LocateStationError {
     CacheWrite(PathBuf, #[source] std::io::Error),
 
     #[error("Failed to decode cache data from '{0}'")]
-    CacheDecode(PathBuf, #[source] Box<bincode::error::DecodeError>),
+    CacheDecode(PathBuf, #[source] rkyv::rancor::Error),
 
     #[error("Failed to encode cache data")]
-    CacheEncode(#[source] Box<bincode::error::EncodeError>),
+    CacheEncode(#[source] rkyv::rancor::Error),
 
     #[error("Network request failed for {0}")]
     NetworkRequest(String, #[source] reqwest::Error),

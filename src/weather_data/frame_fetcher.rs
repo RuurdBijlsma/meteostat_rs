@@ -187,7 +187,7 @@ mod tests {
     }
 
     // Helper to get a nearby station ID (Berlin area)
-    async fn get_nearby_station_id(client: &Meteostat) -> Result<String, MeteostatError> {
+    fn get_nearby_station_id(client: &Meteostat) -> Result<String, MeteostatError> {
         let berlin = LatLon(52.52, 13.4); // Berlin approximate
         client
             .find_stations()
@@ -203,18 +203,18 @@ mod tests {
             }) // Use appropriate error
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_cache_refresh_not_triggered_when_recent() -> Result<(), Box<dyn std::error::Error>>
     {
         let temp_dir = tempdir()?;
         let cache_path = temp_dir.path().to_path_buf();
         let client = Meteostat::with_cache_folder(cache_path.clone()).await?;
-        let station_id = get_nearby_station_id(&client).await?;
+        let station_id = get_nearby_station_id(&client)?;
         let frequency = Frequency::Daily;
         let parquet_path = get_parquet_path(&cache_path, &station_id, frequency);
 
         // 1. Initial fetch to create cache
-        println!("Initial fetch for {}...", station_id);
+        println!("Initial fetch for {station_id}...");
         let _ = client.daily().station(&station_id).call().await?;
         assert!(
             parquet_path.exists(),
@@ -223,7 +223,7 @@ mod tests {
         let mtime1 = get_mtime(&parquet_path)
             .await
             .expect("Failed to get mtime 1");
-        println!("Initial mtime: {:?}", mtime1);
+        println!("Initial mtime: {mtime1:?}");
 
         // Give it a moment to ensure times aren't *exactly* the same if filesystem resolution is low
         tokio::time::sleep(Duration::from_secs(1)).await;
@@ -239,7 +239,7 @@ mod tests {
         let mtime2 = get_mtime(&parquet_path)
             .await
             .expect("Failed to get mtime 2");
-        println!("Mtime after RequiredData::Any: {:?}", mtime2);
+        println!("Mtime after RequiredData::Any: {mtime2:?}");
         assert_eq!(
             mtime1, mtime2,
             "Cache should NOT have been refreshed with RequiredData::Any"
@@ -247,10 +247,7 @@ mod tests {
 
         // 3. Fetch again with a recent RequiredData year (should still use cache)
         let current_year = Utc::now().year();
-        println!(
-            "Fetching again with RequiredData::FullYear({}) (current year)...",
-            current_year
-        );
+        println!("Fetching again with RequiredData::FullYear({current_year}) (current year)...");
         let _ = client
             .daily()
             .station(&station_id)
@@ -260,10 +257,7 @@ mod tests {
         let mtime3 = get_mtime(&parquet_path)
             .await
             .expect("Failed to get mtime 3");
-        println!(
-            "Mtime after RequiredData::FullYear({}): {:?}",
-            current_year, mtime3
-        );
+        println!("Mtime after RequiredData::FullYear({current_year}): {mtime3:?}");
         assert_eq!(
             mtime1, mtime3,
             "Cache should NOT have been refreshed with current year requirement"
@@ -273,33 +267,30 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_cache_refresh_not_triggered_for_future_date(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = tempdir()?;
         let cache_path = temp_dir.path().to_path_buf();
         let client = Meteostat::with_cache_folder(cache_path.clone()).await?;
-        let station_id = get_nearby_station_id(&client).await?;
+        let station_id = get_nearby_station_id(&client)?;
         let frequency = Frequency::Daily;
         let parquet_path = get_parquet_path(&cache_path, &station_id, frequency);
 
         // 1. Initial fetch
-        println!("Initial fetch for {}...", station_id);
+        println!("Initial fetch for {station_id}...");
         let _ = client.daily().station(&station_id).call().await?;
         assert!(parquet_path.exists());
         let mtime1 = get_mtime(&parquet_path)
             .await
             .expect("Failed to get mtime 1");
-        println!("Initial mtime: {:?}", mtime1);
+        println!("Initial mtime: {mtime1:?}");
 
         tokio::time::sleep(Duration::from_secs(1)).await;
 
         // 2. Fetch with a future date requirement
         let future_year = Utc::now().year() + 5;
-        println!(
-            "Fetching again with RequiredData::FullYear({}) (future)...",
-            future_year
-        );
+        println!("Fetching again with RequiredData::FullYear({future_year}) (future)...");
         let _ = client
             .daily()
             .station(&station_id)
@@ -309,7 +300,7 @@ mod tests {
         let mtime2 = get_mtime(&parquet_path)
             .await
             .expect("Failed to get mtime 2");
-        println!("Mtime after future year requirement: {:?}", mtime2);
+        println!("Mtime after future year requirement: {mtime2:?}");
 
         // Cache should NOT be cleared for future dates
         assert_eq!(
@@ -321,19 +312,19 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_cache_refresh_triggered_when_required_date_is_newer(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = tempdir()?;
         let cache_path = temp_dir.path().to_path_buf();
         let client = Meteostat::with_cache_folder(cache_path.clone()).await?;
-        let station_id = get_nearby_station_id(&client).await?;
+        let station_id = get_nearby_station_id(&client)?;
         let frequency = Frequency::Daily;
         let parquet_path = get_parquet_path(&cache_path, &station_id, frequency);
 
         // --- Setup: Create an "old" cache file ---
         // 1. Fetch normally to create the initial cache file.
-        println!("Initial fetch for {} to create cache...", station_id);
+        println!("Initial fetch for {station_id} to create cache...");
         let _ = client.daily().station(&station_id).call().await?;
         assert!(
             parquet_path.exists(),
@@ -342,7 +333,7 @@ mod tests {
         let mtime_initial = get_mtime(&parquet_path)
             .await
             .expect("Failed to get initial mtime");
-        println!("Initial cache mtime: {:?}", mtime_initial);
+        println!("Initial cache mtime: {mtime_initial:?}");
 
         // 2. **Crucial Step**: Manually delete the file to *simulate* the effect of
         //    `clear_cache` being called because the time check *would have passed*
@@ -358,8 +349,7 @@ mod tests {
         //    this MUST trigger a new download and create a new cache file.
         let recent_past_year = Utc::now().year() - 1; // e.g., 2023 if now is 2024
         println!(
-            "Fetching again with RequiredData::FullYear({}) (should trigger re-download)...",
-            recent_past_year
+            "Fetching again with RequiredData::FullYear({recent_past_year}) (should trigger re-download)..."
         );
         let _ = client
             .daily()
@@ -377,7 +367,7 @@ mod tests {
         let mtime_after_refresh = get_mtime(&parquet_path)
             .await
             .expect("Failed to get mtime after refresh");
-        println!("Mtime after required fetch: {:?}", mtime_after_refresh);
+        println!("Mtime after required fetch: {mtime_after_refresh:?}");
 
         // The new mtime should be *later* than the initial mtime (before deletion).
         // Allow for a small tolerance if filesystem time resolution is coarse, though

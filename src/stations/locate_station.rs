@@ -3,8 +3,6 @@ use crate::types::frequency::{Frequency, RequiredData};
 use crate::types::station::YearRange;
 use crate::types::station::{DateRange, Station};
 use async_compression::tokio::bufread::GzipDecoder;
-use bincode;
-use bincode::config::{Configuration, Fixint, LittleEndian};
 use chrono::{Datelike, NaiveDate};
 use futures_util::TryStreamExt;
 use haversine::{distance, Location as HaversineLocation, Units};
@@ -14,15 +12,14 @@ use rstar::RTree;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use std::fs::remove_file;
+use std::io::Write;
 use std::io::{self};
 use std::path::Path;
 use tokio::io::{AsyncReadExt, BufReader};
 use tokio_util::io::StreamReader;
 
 const DATA_URL: &str = "https://bulk.meteostat.net/v2/stations/lite.json.gz";
-pub const BINCODE_CACHE_FILE_NAME: &str = "stations_lite.bin";
-const BINCODE_CONFIG: Configuration<LittleEndian, Fixint> =
-    bincode::config::standard().with_fixed_int_encoding();
+pub const RKYV_CACHE_FILE_NAME: &str = "stations_lite.rkyv";
 
 #[derive(Debug, Clone)]
 pub struct StationLocator {
@@ -54,7 +51,7 @@ impl Ord for StationCandidate<'_> {
 
 impl StationLocator {
     pub async fn new(cache_dir: &Path) -> Result<Self, LocateStationError> {
-        let cache_file = cache_dir.join(BINCODE_CACHE_FILE_NAME);
+        let cache_file = cache_dir.join(RKYV_CACHE_FILE_NAME);
 
         let stations: Vec<Station>;
 
@@ -71,14 +68,12 @@ impl StationLocator {
         Ok(Self { rtree })
     }
 
-    // --- Caching and Fetching methods remain the same ---
+    // --- Caching and Fetching methods ---
     fn get_cached_stations(cache_path: &Path) -> Result<Vec<Station>, LocateStationError> {
         let bytes = std::fs::read(cache_path)
             .map_err(|e| LocateStationError::CacheRead(cache_path.to_path_buf(), e))?;
-        let (decoded_stations, _) =
-            bincode::serde::decode_from_slice::<Vec<Station>, _>(&bytes, BINCODE_CONFIG).map_err(
-                |e| LocateStationError::CacheDecode(cache_path.to_path_buf(), Box::from(e)),
-            )?;
+        let decoded_stations = rkyv::from_bytes::<Vec<Station>, rkyv::rancor::Error>(&bytes)
+            .map_err(|e| LocateStationError::CacheDecode(cache_path.to_path_buf(), e))?;
         Ok(decoded_stations)
     }
 
@@ -121,22 +116,51 @@ impl StationLocator {
         stations: Vec<Station>,
         cache_path: &Path,
     ) -> Result<(), LocateStationError> {
-        let bincode_data = tokio::task::spawn_blocking({
+        let rkyv_data = tokio::task::spawn_blocking({
             move || {
-                bincode::serde::encode_to_vec(stations, BINCODE_CONFIG)
-                    .map_err(|e| LocateStationError::CacheEncode(Box::new(e)))
+                rkyv::to_bytes::<rkyv::rancor::Error>(&stations)
+                    .map_err(LocateStationError::CacheEncode)
             }
         })
         .await??;
-        tokio::fs::write(&cache_path, &bincode_data)
-            .await
-            .map_err(|e| LocateStationError::CacheWrite(cache_path.to_path_buf(), e))?;
+        let path_buf = cache_path.to_path_buf();
+        tokio::task::spawn_blocking(move || {
+            let parent = path_buf.parent().ok_or_else(|| {
+                LocateStationError::CacheWrite(
+                    path_buf.clone(),
+                    io::Error::new(io::ErrorKind::NotFound, "No parent directory"),
+                )
+            })?;
+            if path_buf.exists() {
+                return Ok::<(), LocateStationError>(());
+            }
+            let mut temp_file = tempfile::NamedTempFile::new_in(parent)
+                .map_err(|e| LocateStationError::CacheWrite(path_buf.clone(), e))?;
+            temp_file
+                .write_all(&rkyv_data)
+                .map_err(|e| LocateStationError::CacheWrite(path_buf.clone(), e))?;
+            temp_file
+                .flush()
+                .map_err(|e| LocateStationError::CacheWrite(path_buf.clone(), e))?;
+            if path_buf.exists() {
+                return Ok::<(), LocateStationError>(());
+            }
+            if let Err(err) = temp_file.persist(&path_buf) {
+                if path_buf.exists() {
+                    return Ok::<(), LocateStationError>(());
+                }
+                return Err(LocateStationError::CacheWrite(path_buf.clone(), err.error));
+            }
+            Ok::<(), LocateStationError>(())
+        })
+        .await??;
+
         Ok(())
     }
 
     /// Clears the cache and rebuilds the rtree from fresh data
     pub async fn rebuild_cache(&mut self, cache_dir: &Path) -> Result<(), LocateStationError> {
-        let cache_file = cache_dir.join(BINCODE_CACHE_FILE_NAME);
+        let cache_file = cache_dir.join(RKYV_CACHE_FILE_NAME);
         if cache_file.exists() {
             remove_file(&cache_file)
                 .map_err(|e| LocateStationError::CacheWrite(cache_file.clone(), e))?;
@@ -171,7 +195,7 @@ impl StationLocator {
             return self.fast_proximity_query(latitude, longitude, n_results, max_distance_km);
         }
 
-        // --- Filtered path: Use heap + heuristic limit ---
+        // --- Filtered path: Use heap ---
         self.filtered_heap_query(
             latitude,
             longitude,
@@ -199,7 +223,7 @@ impl StationLocator {
 
         let mut stations_with_dist: Vec<(Station, f64)> = self
             .rtree
-            .nearest_neighbor_iter(&query_point_rtree)
+            .nearest_neighbor_iter(query_point_rtree)
             .take(candidate_limit)
             .filter_map(|station| {
                 // Use filter_map for combined Haversine calc + distance filter
@@ -232,7 +256,7 @@ impl StationLocator {
         stations_with_dist
     }
 
-    /// Query using `BinaryHeap` for filtering, with a heuristic limit on R-Tree iteration.
+    /// Query using `BinaryHeap` for filtering.
     fn filtered_heap_query(
         &self,
         latitude: f64,
@@ -247,19 +271,18 @@ impl StationLocator {
 
         // Heuristic limit for filtered queries. Might need tuning.
         // A larger iteration_limit increases chance of correctness but potentially slows down.
-        let iteration_limit = n_results + 1;
+        let iteration_limit = n_results + 3;
         let mut items_checked = 0;
 
-        for station in self.rtree.nearest_neighbor_iter(&query_point_rtree) {
+        for station in self.rtree.nearest_neighbor_iter(query_point_rtree) {
             items_checked += 1;
 
-            // --- 1. Check inventory criteria (relatively cheap) ---
-            // Pass frequency by value (it's Copy), required_date by ref.
+            // --- Check inventory criteria (relatively cheap) ---
             if !Self::station_meets_criteria(station, Some(frequency), required_date.as_ref()) {
                 continue;
             }
 
-            // --- 2. Calculate Haversine distance (more expensive) ---
+            // --- Calculate Haversine distance (more expensive) ---
             let station_loc = HaversineLocation {
                 latitude: station.location.latitude,
                 longitude: station.location.longitude,
@@ -273,7 +296,7 @@ impl StationLocator {
                 Units::Kilometers,
             );
 
-            // --- 3. Check max distance ---
+            // --- Check max distance ---
             if dist_km > max_distance_km * 2.0 {
                 // It's Joever.
                 break;
@@ -283,7 +306,6 @@ impl StationLocator {
                 continue;
             }
 
-            // --- 4. Manage the heap ---
             let current_candidate = StationCandidate {
                 distance_km: OrderedFloat(dist_km),
                 station,
@@ -300,7 +322,7 @@ impl StationLocator {
                 }
             }
 
-            // --- 5. Heuristic Early Exit Check ---
+            // Heuristic Early Exit Check ---
             // If we have checked enough items and the heap is full,
             // assume we are unlikely to find a better candidate later.
             // This is the key performance optimization for filtered queries.
@@ -309,7 +331,7 @@ impl StationLocator {
             }
         } // End R-tree iteration
 
-        // --- 6. Extract results from the heap ---
+        // --- Extract results from the heap ---
         let results: Vec<(Station, f64)> = heap
             .into_sorted_vec() // Sorts ascending by distance (based on Ord impl)
             .into_iter()
@@ -319,7 +341,7 @@ impl StationLocator {
         results
     }
 
-    // --- Inventory check helpers remain the same ---
+    // --- Inventory check helpers ---
     fn station_meets_criteria(
         station: &Station,
         frequency: Option<Frequency>,
@@ -403,11 +425,9 @@ mod tests {
     use super::*;
     use crate::types::frequency::{Frequency, RequiredData};
     use crate::types::station::Station;
-    // Make sure get_cache_dir is available or replace with hardcoded path for tests
     use crate::utils::get_cache_dir;
     use chrono::{Datelike, NaiveDate};
 
-    // Helper to get a StationLocator instance, handles caching
     async fn get_locator() -> Result<StationLocator, LocateStationError> {
         let cache_path = get_cache_dir().expect("Failed to get cache dir for tests");
         tokio::fs::create_dir_all(&cache_path)
@@ -418,15 +438,7 @@ mod tests {
             .expect("Failed to initialize StationLocator"))
     }
 
-    // Helper to validate basic query results (consider adding back criteria check)
-    fn validate_results(
-        results: &[(Station, f64)],
-        expected_max_len: usize,
-        max_distance_km: f64,
-        // You might want to pass frequency/required_date back in for deeper validation
-        // frequency: Option<Frequency>,
-        // required_date: Option<RequiredDate>,
-    ) {
+    fn validate_results(results: &[(Station, f64)], expected_max_len: usize, max_distance_km: f64) {
         assert!(
             results.len() <= expected_max_len,
             "Expected max {} results, got {}",
@@ -452,13 +464,10 @@ mod tests {
                 last_dist
             );
             last_dist = *dist;
-            // Add criteria check back if needed:
-            // assert!(StationLocator::station_meets_criteria(station, frequency, required_date.as_ref()), "Station {} failed criteria", station.id);
         }
     }
 
-    // --- Individual test cases remain largely the same, calling locator.query(...) ---
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_basic_query_no_filters() -> Result<(), LocateStationError> {
         let locator = get_locator().await?;
         let lat = 40.7128;
@@ -475,7 +484,7 @@ mod tests {
         validate_results(&results, n, max_d);
         Ok(())
     }
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_query_with_frequency_any_date() -> Result<(), LocateStationError> {
         let locator = get_locator().await?;
         let lat = 52.5200;
@@ -492,13 +501,12 @@ mod tests {
             max_d
         );
         validate_results(&results, n, max_d);
-        // Add specific check for Daily data if desired
         for (s, _) in &results {
             assert!(s.inventory.daily.start.is_some());
         }
         Ok(())
     }
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_query_with_frequency_specific_date() -> Result<(), LocateStationError> {
         let locator = get_locator().await?;
         let lat = 34.0522;
@@ -517,7 +525,6 @@ mod tests {
             max_d
         );
         validate_results(&results, n, max_d);
-        // Add specific check for date inclusion if desired
         for (s, _) in &results {
             let inv = &s.inventory.hourly;
             assert!(
@@ -527,7 +534,7 @@ mod tests {
         }
         Ok(())
     }
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_query_with_frequency_date_range_complete_containment(
     ) -> Result<(), LocateStationError> {
         let locator = get_locator().await?;
@@ -552,7 +559,6 @@ mod tests {
             max_d
         );
         validate_results(&results, n, max_d);
-        // Add specific check for year range containment if desired
         for (s, _) in &results {
             let inv = &s.inventory.monthly;
             assert!(
@@ -562,7 +568,7 @@ mod tests {
         }
         Ok(())
     }
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_query_climate_data() -> Result<(), LocateStationError> {
         let locator = get_locator().await?;
         let lat = -33.8688;
@@ -581,7 +587,7 @@ mod tests {
         validate_results(&results, n, max_d);
         Ok(())
     }
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_query_no_results_tight_radius() -> Result<(), LocateStationError> {
         let locator = get_locator().await?;
         let lat = 0.0;
@@ -599,7 +605,7 @@ mod tests {
         assert!(results.is_empty());
         Ok(())
     }
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_query_n_results_zero() -> Result<(), LocateStationError> {
         let locator = get_locator().await?;
         let lat = 40.7128;
@@ -616,7 +622,7 @@ mod tests {
         assert!(results.is_empty());
         Ok(())
     }
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_query_specific_date_outside_range() -> Result<(), LocateStationError> {
         let locator = get_locator().await?;
         let lat = 51.5074;
@@ -635,7 +641,6 @@ mod tests {
             max_d
         );
         validate_results(&results, n, max_d);
-        // Most likely empty, validation inside validate_results covers correctness if not empty
         Ok(())
     }
 }

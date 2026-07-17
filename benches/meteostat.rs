@@ -1,8 +1,10 @@
 use chrono::{NaiveDate, TimeZone, Utc};
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 use meteostat::{Frequency, InventoryRequest, LatLon, Meteostat, RequiredData, Year};
+use std::hint::black_box;
 use tokio::runtime::Runtime;
 
+#[allow(clippy::too_many_lines)]
 fn bench(c: &mut Criterion) {
     let station_str = "10637";
 

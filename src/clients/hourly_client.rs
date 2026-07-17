@@ -206,11 +206,11 @@ mod tests {
 
     // Helper to create a known location (Berlin Mitte)
     fn berlin_location() -> LatLon {
-        LatLon(52.520008, 13.404954)
+        LatLon(52.520_008, 13.404_954)
     }
 
     // HOURLY
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_hourly_from_station_for_period() -> Result<(), MeteostatError> {
         let client = Meteostat::new().await?;
         let data = client
@@ -225,7 +225,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_hourly_from_station_with_filter() -> Result<(), MeteostatError> {
         let client = Meteostat::new().await?;
         let data = client
@@ -246,7 +246,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_hourly_from_station_at_specific_datetime() -> Result<(), MeteostatError> {
         let client = Meteostat::new().await?;
         let data = client
@@ -263,7 +263,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_hourly_from_location_for_period() -> Result<(), MeteostatError> {
         let client = Meteostat::new().await?;
         let data = client

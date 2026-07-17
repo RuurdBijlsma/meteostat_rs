@@ -58,10 +58,7 @@ try {
 
     # Clippy check
     Write-Host "`n=== Running Clippy checks ===" -ForegroundColor Cyan
-    cargo clippy --all-features -- `
-        -D warnings -W clippy::pedantic `
-        -W clippy::nursery -W rust-2018-idioms `
-        -A clippy::single-match-else
+    cargo clippy --no-deps --all-features --tests --benches -- -D clippy::all -D clippy::pedantic -D clippy::nursery
     if ($LASTEXITCODE -ne 0) {
         $checksPassed = $false
     }

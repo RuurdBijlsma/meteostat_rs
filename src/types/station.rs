@@ -2,11 +2,14 @@
 //! including inventory, location, and identifiers. Also includes implementations
 //! necessary for spatial indexing using the `rstar` crate.
 
+use crate::types::rkyv_datetime::ChronoDateOption;
 use crate::LatLon;
 use chrono::NaiveDate;
+use rkyv::{Archive, Deserialize as ArchiveDeserialize, Serialize as ArchiveSerialize};
 use rstar::{PointDistance, RTreeObject, AABB};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
 // --- Data Structures ---
 
 /// Links a station with a distance to a point.
@@ -24,6 +27,7 @@ pub struct StationWithDistance {
 /// geographical location, and data availability (inventory).
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
+#[derive(Archive, ArchiveSerialize, ArchiveDeserialize)]
 pub struct Station {
     /// The unique Meteostat station identifier (e.g., "10637").
     pub id: String,
@@ -48,7 +52,17 @@ pub struct Station {
 /// Indicates the approximate start and end dates/years for which data is expected
 /// to be available according to Meteostat's metadata. Note that gaps might exist
 /// within these ranges.
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Serialize,
+    Deserialize,
+    Clone,
+    PartialEq,
+    Eq,
+    Archive,
+    ArchiveSerialize,
+    ArchiveDeserialize,
+)]
 pub struct Inventory {
     /// The reported start and end dates for daily data.
     pub daily: DateRange,
@@ -65,18 +79,38 @@ pub struct Inventory {
 /// Represents a date range with optional start and end dates.
 ///
 /// Used within [`Inventory`] for frequencies where day-level precision is relevant (daily, hourly).
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Serialize,
+    Deserialize,
+    Clone,
+    PartialEq,
+    Eq,
+    Archive,
+    ArchiveSerialize,
+    ArchiveDeserialize,
+)]
 pub struct DateRange {
-    /// The earliest date for which data is reported available, if known.
+    #[rkyv(with = ChronoDateOption)]
     pub start: Option<NaiveDate>,
-    /// The latest date for which data is reported available, if known.
+    #[rkyv(with = ChronoDateOption)]
     pub end: Option<NaiveDate>,
 }
 
 /// Represents a year range with optional start and end years.
 ///
 /// Used within [`Inventory`] for frequencies where year-level precision is sufficient (monthly, climate normals).
-#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
+#[derive(
+    Debug,
+    Serialize,
+    Deserialize,
+    Clone,
+    Eq,
+    PartialEq,
+    Archive,
+    ArchiveSerialize,
+    ArchiveDeserialize,
+)]
 pub struct YearRange {
     /// The earliest year for which data is reported available, if known.
     pub start: Option<i32>,
@@ -85,7 +119,17 @@ pub struct YearRange {
 }
 
 /// Holds various alternative identifiers that might be associated with a weather station.
-#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
+#[derive(
+    Debug,
+    Serialize,
+    Deserialize,
+    Clone,
+    Eq,
+    PartialEq,
+    Archive,
+    ArchiveSerialize,
+    ArchiveDeserialize,
+)]
 pub struct Identifiers {
     /// National station identifier, if available.
     pub national: Option<String>,
@@ -96,7 +140,9 @@ pub struct Identifiers {
 }
 
 /// Represents the geographical location of a weather station.
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(
+    Debug, Serialize, Deserialize, Clone, PartialEq, Archive, ArchiveSerialize, ArchiveDeserialize,
+)]
 pub struct StationLocation {
     /// Latitude in decimal degrees (positive for North, negative for South).
     pub latitude: f64,

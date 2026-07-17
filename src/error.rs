@@ -42,7 +42,7 @@ pub enum MeteostatError {
         lat: f64,
         lon: f64,
         stations_tried: usize,
-        last_error: Option<Box<MeteostatError>>,
+        last_error: Option<Box<Self>>,
     },
 
     #[error("Could not detect frequency variant from dataframe.\n{0}")]

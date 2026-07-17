@@ -193,11 +193,11 @@ mod tests {
 
     // Helper to create a known location (Berlin Mitte)
     fn berlin_location() -> LatLon {
-        LatLon(52.520008, 13.404954)
+        LatLon(52.520_008, 13.404_954)
     }
 
     // CLIMATE
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_climate_from_station() -> Result<(), MeteostatError> {
         let client = Meteostat::new().await?;
         // Climate normals station (e.g., Berlin-Tegel if available)
@@ -209,11 +209,11 @@ mod tests {
             .await?
             .frame
             .collect()?;
-        assert!(!data.is_empty());
+        assert!(data.height() > 0);
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_climate_from_station_with_filter() -> Result<(), MeteostatError> {
         let client = Meteostat::new().await?;
         // Using a station known to exist and likely have climate data
@@ -226,13 +226,13 @@ mod tests {
             .frame
             .collect()?;
         assert!(
-            !data.is_empty(),
+            data.height() > 0,
             "Expected climate data even with RequiredData filter"
         );
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_climate_from_location() -> Result<(), MeteostatError> {
         let client = Meteostat::new().await?;
         let data = client
@@ -242,7 +242,10 @@ mod tests {
             .await?
             .frame
             .collect()?;
-        assert!(!data.is_empty(), "Expected climate normals for Berlin area");
+        assert!(
+            data.height() > 0,
+            "Expected climate normals for Berlin area"
+        );
         Ok(())
     }
 }

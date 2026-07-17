@@ -439,7 +439,7 @@ mod tests {
         client.monthly().station("10384").call().await // Berlin Tempelhof
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_monthly_frame_new_schema() -> Result<(), Box<dyn std::error::Error>> {
         let monthly_lazy = get_test_monthly_frame().await?;
 
@@ -454,8 +454,7 @@ mod tests {
         for col_name in expected_cols {
             assert!(
                 actual_cols.contains(&&PlSmallStr::from_str(col_name)),
-                "Expected column '{}' not found in monthly data",
-                col_name
+                "Expected column '{col_name}' not found in monthly data"
             );
         }
         // Check year/month types (likely i64 from Polars CSV reader)
@@ -468,7 +467,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_monthly_frame_filter_temp() -> Result<(), Box<dyn std::error::Error>> {
         let monthly_lazy = get_test_monthly_frame().await?;
 
@@ -479,10 +478,9 @@ mod tests {
         if df.height() > 0 {
             println!("Found {} months with tavg > 20.0", df.height());
             let temp_series = df.column("tavg")?.f64()?;
-            assert!(temp_series.into_iter().all(|opt_temp| match opt_temp {
-                Some(t) => t > 20.0,
-                None => true, // Allow nulls
-            }));
+            assert!(temp_series
+                .iter()
+                .all(|opt_temp| opt_temp.is_none_or(|t| t > 20.0)));
         } else {
             println!("No months found with tavg > 20.0 in the test data subset.");
         }
@@ -490,7 +488,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_monthly_frame_get_at_specific_month() -> Result<(), Box<dyn std::error::Error>> {
         let monthly_lazy = get_test_monthly_frame().await?;
         // Choose a month likely to exist
@@ -502,8 +500,7 @@ mod tests {
         assert_eq!(
             df.height(),
             1,
-            "Expected exactly one row for month {:?}",
-            target_month
+            "Expected exactly one row for month {target_month:?}"
         );
 
         // Verify the year and month in that row (expecting i64 from Polars)
@@ -512,13 +509,13 @@ mod tests {
         let retrieved_year = year_series.get(0).unwrap();
         let retrieved_month = month_series.get(0).unwrap();
 
-        assert_eq!(retrieved_year, target_month.year() as i64);
-        assert_eq!(retrieved_month, target_month.month() as i64);
+        assert_eq!(retrieved_year, i64::from(target_month.year()));
+        assert_eq!(retrieved_month, i64::from(target_month.month()));
 
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_monthly_frame_get_range_specific_months() -> Result<(), Box<dyn std::error::Error>>
     {
         let monthly_lazy = get_test_monthly_frame().await?;
@@ -540,9 +537,7 @@ mod tests {
         );
         assert!(
             df.height() > 0, // Should find *some* data usually
-            "Expected > 0 rows for the period {:?} to {:?}",
-            start_month,
-            end_month
+            "Expected > 0 rows for the period {start_month:?} to {end_month:?}"
         );
 
         // Verify year/month are within the range if rows exist
@@ -557,15 +552,15 @@ mod tests {
 
             // Check first row is >= start
             assert!(
-                first_year > start_month.year() as i64
-                    || (first_year == start_month.year() as i64
-                        && first_month >= start_month.month() as i64)
+                first_year > i64::from(start_month.year())
+                    || (first_year == i64::from(start_month.year())
+                        && first_month >= i64::from(start_month.month()))
             );
             // Check last row is <= end
             assert!(
-                last_year < end_month.year() as i64
-                    || (last_year == end_month.year() as i64
-                        && last_month <= end_month.month() as i64)
+                last_year < i64::from(end_month.year())
+                    || (last_year == i64::from(end_month.year())
+                        && last_month <= i64::from(end_month.month()))
             );
 
             // If exactly expected rows, check bounds precisely
@@ -580,7 +575,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_monthly_frame_get_for_period_year() -> Result<(), Box<dyn std::error::Error>> {
         let monthly_lazy = get_test_monthly_frame().await?;
         let target_year = Year(2017);
@@ -606,13 +601,13 @@ mod tests {
         if df.height() > 0 {
             let year_series = df.column("year")?.i64()?;
             assert!(year_series
-                .into_iter()
-                .all(|opt_year| opt_year.unwrap() == target_year.get() as i64));
+                .iter()
+                .all(|opt_year| opt_year.unwrap() == i64::from(target_year.get())));
 
             // If exactly 12, verify months are 1 through 12
             if df.height() == 12 {
                 let month_series = df.column("month")?.i64()?;
-                let mut months: Vec<i64> = month_series.into_iter().map(|m| m.unwrap()).collect();
+                let mut months: Vec<i64> = month_series.iter().map(|m| m.unwrap()).collect();
                 months.sort_unstable();
                 let expected_months: Vec<i64> = (1..=12).collect();
                 assert_eq!(months, expected_months);
@@ -622,7 +617,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_monthly_frame_get_range_empty_result() -> Result<(), Box<dyn std::error::Error>> {
         let monthly_lazy = get_test_monthly_frame().await?;
         // Use a past year range where no data exists
@@ -637,7 +632,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_monthly_frame_chaining_period_and_filter(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let monthly_lazy = get_test_monthly_frame().await?;
@@ -666,7 +661,7 @@ mod tests {
                 let year_val = year_series.get(i).unwrap();
                 let prcp_val = prcp_series.get(i).unwrap_or(0.0); // Default to 0 if null
 
-                assert_eq!(year_val, target_year.get() as i64);
+                assert_eq!(year_val, i64::from(target_year.get()));
                 assert!(prcp_val > 50.0);
             }
         }
@@ -676,7 +671,7 @@ mod tests {
 
     // --- New Tests for Collection Methods ---
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_collect_monthly_vec() -> Result<(), Box<dyn std::error::Error>> {
         let monthly_lazy = get_test_monthly_frame().await?;
         let start_month = Month::new(1, 2021);
@@ -699,7 +694,7 @@ mod tests {
 
         // Check the first record if it exists
         if let Some(first_record) = monthly_vec.first() {
-            println!("First collected record: {:?}", first_record);
+            println!("First collected record: {first_record:?}");
             assert!(first_record.year >= start_month.year());
             assert!(first_record.year <= end_month.year());
             // Could add more specific month check logic if needed
@@ -712,7 +707,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_collect_monthly_single_row_success() -> Result<(), Box<dyn std::error::Error>> {
         let monthly_lazy = get_test_monthly_frame().await?;
         let target_month = Month::new(7, 2019); // Expect data exists
@@ -720,7 +715,7 @@ mod tests {
         let single_month_lazy = monthly_lazy.get_at(target_month)?;
         let monthly_record = single_month_lazy.collect_single_monthly()?;
 
-        println!("Collected single record: {:?}", monthly_record);
+        println!("Collected single record: {monthly_record:?}");
         assert_eq!(monthly_record.year, target_month.year());
         assert_eq!(monthly_record.month, target_month.month());
         assert!(monthly_record.average_temperature.is_some());
@@ -730,7 +725,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_collect_monthly_single_row_fail_multiple_rows(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let monthly_lazy = get_test_monthly_frame().await?;
@@ -742,20 +737,20 @@ mod tests {
 
         assert!(result.is_err());
         let err = result.err().unwrap();
-        println!("Got expected error: {:?}", err);
+        println!("Got expected error: {err:?}");
 
         match err {
             MeteostatError::ExpectedSingleRow { actual } => {
                 // Should be 12 if data is complete, but allow less due to potential missing data
-                assert!(actual > 1, "Expected actual rows to be > 1, got {}", actual);
+                assert!(actual > 1, "Expected actual rows to be > 1, got {actual}");
             }
-            _ => panic!("Expected MeteostatError::ExpectedSingleRow, got {:?}", err),
+            _ => panic!("Expected MeteostatError::ExpectedSingleRow, got {err:?}"),
         }
 
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_collect_monthly_single_row_fail_zero_rows(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let monthly_lazy = get_test_monthly_frame().await?;
@@ -767,19 +762,19 @@ mod tests {
 
         assert!(result.is_err());
         let err = result.err().unwrap();
-        println!("Got expected error: {:?}", err);
+        println!("Got expected error: {err:?}");
 
         match err {
             MeteostatError::ExpectedSingleRow { actual } => {
-                assert_eq!(actual, 0, "Expected actual rows to be 0, got {}", actual);
+                assert_eq!(actual, 0, "Expected actual rows to be 0, got {actual}");
             }
-            _ => panic!("Expected MeteostatError::ExpectedSingleRow, got {:?}", err),
+            _ => panic!("Expected MeteostatError::ExpectedSingleRow, got {err:?}"),
         }
 
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_collect_monthly_vec_empty_result() -> Result<(), Box<dyn std::error::Error>> {
         let monthly_lazy = get_test_monthly_frame().await?;
         // Use a date far in the past, guaranteed to have no data

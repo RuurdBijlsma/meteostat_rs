@@ -4,7 +4,7 @@
 //! different types of weather data (hourly, daily, monthly, climate normals)
 //! either by station ID or by geographical location.
 
-use crate::stations::locate_station::{StationLocator, BINCODE_CACHE_FILE_NAME};
+use crate::stations::locate_station::{StationLocator, RKYV_CACHE_FILE_NAME};
 use crate::types::station::StationWithDistance;
 use crate::utils::{ensure_cache_dir_exists, get_cache_dir};
 use crate::weather_data::frame_fetcher::FrameFetcher;
@@ -531,7 +531,7 @@ impl Meteostat {
     /// # }
     /// ```
     pub async fn clear_station_list_cache(&self) -> Result<(), MeteostatError> {
-        let stations_file = self.cache_folder.join(BINCODE_CACHE_FILE_NAME);
+        let stations_file = self.cache_folder.join(RKYV_CACHE_FILE_NAME);
         match tokio::fs::remove_file(&stations_file).await {
             Ok(()) => Ok(()),
             Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(()), // Not an error if already gone
@@ -762,16 +762,16 @@ mod tests {
 
     // Helper to create a known location (Berlin Mitte)
     fn berlin_location() -> LatLon {
-        LatLon(52.520008, 13.404954)
+        LatLon(52.520_008, 13.404_954)
     }
 
     /// Helper function to check if a cache file exists
-    async fn cache_file_exists(cache_dir: &Path, station: &str, frequency: Frequency) -> bool {
+    fn cache_file_exists(cache_dir: &Path, station: &str, frequency: Frequency) -> bool {
         let file = cache_dir.join(format!("{}-{}.parquet", frequency.path_segment(), station));
         file.exists()
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_clear_weather_data_cache_per_station() -> Result<(), MeteostatError> {
         let temp_dir = tempdir()?;
         let cache_path = temp_dir.path().to_path_buf();
@@ -782,8 +782,12 @@ mod tests {
         let stations = client.find_stations().location(berlin).call();
         let station_id = &stations.first().unwrap().station.id;
         let _lf = client.hourly().station(station_id).call().await?;
-        println!("Found station ID: {}", station_id);
-        assert!(cache_file_exists(&cache_path, station_id, Frequency::Hourly).await);
+        println!("Found station ID: {station_id}");
+        assert!(cache_file_exists(
+            &cache_path,
+            station_id,
+            Frequency::Hourly
+        ));
 
         // Clear cache for this station's hourly data
         client
@@ -791,13 +795,17 @@ mod tests {
             .await?;
 
         // Verify cache file is gone
-        assert!(!cache_file_exists(&cache_path, station_id, Frequency::Hourly).await);
+        assert!(!cache_file_exists(
+            &cache_path,
+            station_id,
+            Frequency::Hourly
+        ));
 
         temp_dir.close()?;
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_clear_weather_data_cache() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = tempdir()?;
         let cache_path = temp_dir.path().to_path_buf();
@@ -825,7 +833,7 @@ mod tests {
         // --- Verify directory is empty except for stations file (sync version) ---
         let mut file_count = 0;
         let mut stations_file_found = false;
-        let stations_filename = OsStr::new(BINCODE_CACHE_FILE_NAME); // Define expected filename
+        let stations_filename = OsStr::new(RKYV_CACHE_FILE_NAME); // Define expected filename
 
         // Iterate through the directory synchronously
         for entry_result in fs::read_dir(&cache_path)? {
@@ -837,7 +845,7 @@ mod tests {
                 if entry.file_name() == stations_filename {
                     stations_file_found = true;
                 }
-                println!("Found file after clear: {:?}", path); // Debug print
+                println!("Found file after clear: {path:?}"); // Debug print
             }
         }
 
@@ -861,14 +869,14 @@ mod tests {
 
     // --- Constructor Tests ---
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_new_constructor_succeeds() {
         // This test assumes default cache dir resolution works
         let result = Meteostat::new().await;
         assert!(result.is_ok());
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_with_cache_folder_constructor_succeeds() -> Result<(), Box<dyn std::error::Error>>
     {
         let temp_dir = tempdir()?;
@@ -886,7 +894,7 @@ mod tests {
 
     // --- find_stations Tests ---
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_find_stations_basic() -> Result<(), MeteostatError> {
         let client = Meteostat::new().await?;
         let location = berlin_location();
@@ -910,7 +918,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_find_stations_with_limit() -> Result<(), MeteostatError> {
         let client = Meteostat::new().await?;
         let location = berlin_location();
@@ -925,8 +933,7 @@ mod tests {
         assert!(!stations.is_empty(), "Should find stations near Berlin");
         assert!(
             stations.len() <= limit,
-            "Should return at most {} stations",
-            limit
+            "Should return at most {limit} stations",
         );
         println!("Found {} stations (limit {}):", stations.len(), limit);
         for result in &stations {
@@ -939,7 +946,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_find_stations_with_max_distance() -> Result<(), MeteostatError> {
         let client = Meteostat::new().await?;
         let location = berlin_location();
@@ -965,7 +972,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_find_stations_with_inventory_request() -> Result<(), MeteostatError> {
         let client = Meteostat::new().await?;
         let location = berlin_location();
@@ -1000,7 +1007,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_find_stations_no_results_far_away() -> Result<(), MeteostatError> {
         let client = Meteostat::new().await?;
         // A location likely far from any station
@@ -1022,7 +1029,8 @@ mod tests {
 
     // --- Error Handling Tests ---
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
+    #[allow(clippy::float_cmp)]
     async fn test_data_from_location_no_station_within_radius() -> Result<(), MeteostatError> {
         let client = Meteostat::new().await?;
         let location = LatLon(0.0, 0.0); // Middle of Atlantic
@@ -1037,7 +1045,7 @@ mod tests {
 
         assert!(result.is_err());
         let err = result.err().unwrap();
-        println!("Expected error: {:?}", err); // See the error details
+        println!("Expected error: {err:?}"); // See the error details
 
         // Manual check without `matches` macro:
         match err {
@@ -1046,13 +1054,13 @@ mod tests {
                 assert_eq!(lat, location.0);
                 assert_eq!(lon, location.1);
             }
-            _ => panic!("Expected NoStationWithinRadius error, got {:?}", err),
+            _ => panic!("Expected NoStationWithinRadius error, got {err:?}"),
         }
 
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_data_from_location_station_found_but_no_data_error() -> Result<(), MeteostatError>
     {
         // This test is harder to make deterministic without knowing specific station data gaps
@@ -1087,30 +1095,29 @@ mod tests {
 
         assert!(result.is_err());
         let err = result.err().unwrap();
-        println!("Expected error for future data requirement: {:?}", err);
+        println!("Expected error for future data requirement: {err:?}");
 
         match err {
             // This is the most likely error because the query itself finds no stations meeting the criteria
             MeteostatError::NoStationWithinRadius { .. } => {
                 // Test passed - expected this error type
-                println!("Got expected NoStationWithinRadius error due to impossible filter.")
+                println!("Got expected NoStationWithinRadius error due to impossible filter.");
             }
             // This might occur if the station query *did* return stations (e.g., if filtering logic changes)
             // but the subsequent data fetch failed.
             MeteostatError::NoDataFoundForNearbyStations { .. } => {
                 // Test passed - also an acceptable error type in this scenario
-                println!("Got NoDataFoundForNearbyStations error - filter might have passed but fetch failed.")
+                println!("Got NoDataFoundForNearbyStations error - filter might have passed but fetch failed.");
             }
             _ => panic!(
-                "Expected NoStationWithinRadius or NoDataFoundForNearbyStations error, got {:?}",
-                err
+                "Expected NoStationWithinRadius or NoDataFoundForNearbyStations error, got {err:?}"
             ),
         }
 
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_data_from_invalid_station_id() -> Result<(), MeteostatError> {
         let client = Meteostat::new().await?;
         let invalid_station_id = "INVALID_STATION_ID_123"; // Make it less likely to exist by chance
@@ -1125,13 +1132,12 @@ mod tests {
         // The exact error might depend on FrameFetcher's implementation (e.g., file not found, download error).
         assert!(result.is_err());
         let err = result.err().unwrap();
-        println!("Error fetching data for invalid station ID: {:?}", err);
+        println!("Error fetching data for invalid station ID: {err:?}");
 
         // The error should originate from the data fetching layer
         assert!(
             matches!(err, MeteostatError::WeatherData(_)),
-            "Expected a WeatherData error variant, got {:?}",
-            err
+            "Expected a WeatherData error variant, got {err:?}"
         );
 
         Ok(())
