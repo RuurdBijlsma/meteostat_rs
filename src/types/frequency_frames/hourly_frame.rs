@@ -519,7 +519,7 @@ mod tests {
         if df.height() > 0 {
             println!("Found {} hours with temp < 0.0", df.height());
             let temp_series = df.column("temp")?.f64()?;
-            assert!(temp_series.iter().all(|opt_temp| match opt_temp  {
+            assert!(temp_series.iter().all(|opt_temp| match opt_temp {
                 Some(t) => t < 0.0,
                 None => true, // Allow nulls
             }));
@@ -574,7 +574,12 @@ mod tests {
             "Expected exactly one row for hour nearest {} (rounds up)",
             target_dt_round_up
         );
-        let dt_round_up_ms = df_round_up.column("datetime")?.datetime()?.phys.get(0).unwrap(); // Use new var name
+        let dt_round_up_ms = df_round_up
+            .column("datetime")?
+            .datetime()?
+            .phys
+            .get(0)
+            .unwrap(); // Use new var name
         let retrieved_round_up_naive_dt = ms_to_datetime(dt_round_up_ms);
         assert_eq!(
             retrieved_round_up_naive_dt,

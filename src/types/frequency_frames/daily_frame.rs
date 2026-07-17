@@ -381,7 +381,8 @@ impl DailyLazyFrame {
         // --- Iterate through rows and map ---
         for i in 0..df.height() {
             // Get date (essential) - skip row if missing/invalid
-            let date_opt: Option<NaiveDate> = date_ca.phys
+            let date_opt: Option<NaiveDate> = date_ca
+                .phys
                 .get(i)
                 .map(|days_since_epoch| epoch_date + Duration::days(i64::from(days_since_epoch)));
 
@@ -469,7 +470,7 @@ mod tests {
         if df.height() > 0 {
             println!("Found {} days with tavg > 25.0", df.height());
             let temp_series = df.column("tavg")?.f64()?;
-            assert!(temp_series.iter().all(|opt_temp| match opt_temp  {
+            assert!(temp_series.iter().all(|opt_temp| match opt_temp {
                 Some(t) => t > 25.0,
                 None => true, // Allow nulls (should be filtered out by gt ideally)
             }));

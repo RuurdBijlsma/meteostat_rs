@@ -204,11 +204,12 @@ impl WeatherDataLoader {
                 });
             }
 
-            df.set_column_names(&schema_names)
-                .map_err(|e| WeatherDataError::ColumnRenameError {
+            df.set_column_names(&schema_names).map_err(|e| {
+                WeatherDataError::ColumnRenameError {
                     station: station_owned.clone(),
                     source: e,
-                })?;
+                }
+            })?;
 
             // --- START Type Casting and Pre-computation ---
             let mut lazy_df = df.lazy();

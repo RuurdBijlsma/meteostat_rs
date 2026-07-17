@@ -209,7 +209,7 @@ mod tests {
             .await?
             .frame
             .collect()?;
-        assert!(data.height()>0);
+        assert!(data.height() > 0);
         Ok(())
     }
 
@@ -226,7 +226,7 @@ mod tests {
             .frame
             .collect()?;
         assert!(
-            data.height()>0,
+            data.height() > 0,
             "Expected climate data even with RequiredData filter"
         );
         Ok(())
@@ -242,7 +242,10 @@ mod tests {
             .await?
             .frame
             .collect()?;
-        assert!(data.height()>0, "Expected climate normals for Berlin area");
+        assert!(
+            data.height() > 0,
+            "Expected climate normals for Berlin area"
+        );
         Ok(())
     }
 }
