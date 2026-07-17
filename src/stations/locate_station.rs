@@ -271,7 +271,7 @@ impl StationLocator {
 
         // Heuristic limit for filtered queries. Might need tuning.
         // A larger iteration_limit increases chance of correctness but potentially slows down.
-        let iteration_limit = n_results + 1;
+        let iteration_limit = n_results + 3;
         let mut items_checked = 0;
 
         for station in self.rtree.nearest_neighbor_iter(query_point_rtree) {

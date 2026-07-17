@@ -164,22 +164,22 @@ impl WeatherDataLoader {
         let station_owned = station.to_string();
 
         task::spawn_blocking(move || {
-            // Build the static schema for parsing the CSV columns directly to native types
+            // Build the schema.
             let schema = match data_type {
                 Frequency::Hourly => Schema::from_iter(vec![
                     Field::new("date".into(), DataType::String),
                     Field::new("hour".into(), DataType::Int64),
                     Field::new("temp".into(), DataType::Float64),
                     Field::new("dwpt".into(), DataType::Float64),
-                    Field::new("rhum".into(), DataType::Int64),
+                    Field::new("rhum".into(), DataType::Float64), // Parse as Float64, cast later
                     Field::new("prcp".into(), DataType::Float64),
-                    Field::new("snow".into(), DataType::Int64),
-                    Field::new("wdir".into(), DataType::Int64),
+                    Field::new("snow".into(), DataType::Float64), // Parse as Float64, cast later
+                    Field::new("wdir".into(), DataType::Float64), // Parse as Float64, cast later
                     Field::new("wspd".into(), DataType::Float64),
                     Field::new("wpgt".into(), DataType::Float64),
                     Field::new("pres".into(), DataType::Float64),
-                    Field::new("tsun".into(), DataType::Int64),
-                    Field::new("coco".into(), DataType::Int64),
+                    Field::new("tsun".into(), DataType::Float64), // Parse as Float64, cast later
+                    Field::new("coco".into(), DataType::Float64), // Parse as Float64, cast later
                 ]),
                 Frequency::Daily => Schema::from_iter(vec![
                     Field::new("date".into(), DataType::String),
@@ -187,12 +187,12 @@ impl WeatherDataLoader {
                     Field::new("tmin".into(), DataType::Float64),
                     Field::new("tmax".into(), DataType::Float64),
                     Field::new("prcp".into(), DataType::Float64),
-                    Field::new("snow".into(), DataType::Int64),
-                    Field::new("wdir".into(), DataType::Int64),
+                    Field::new("snow".into(), DataType::Float64), // Parse as Float64, cast later
+                    Field::new("wdir".into(), DataType::Float64), // Parse as Float64, cast later
                     Field::new("wspd".into(), DataType::Float64),
                     Field::new("wpgt".into(), DataType::Float64),
                     Field::new("pres".into(), DataType::Float64),
-                    Field::new("tsun".into(), DataType::Int64),
+                    Field::new("tsun".into(), DataType::Float64), // Parse as Float64, cast later
                 ]),
                 Frequency::Monthly => Schema::from_iter(vec![
                     Field::new("year".into(), DataType::Int64),
@@ -203,7 +203,7 @@ impl WeatherDataLoader {
                     Field::new("prcp".into(), DataType::Float64),
                     Field::new("wspd".into(), DataType::Float64),
                     Field::new("pres".into(), DataType::Float64),
-                    Field::new("tsun".into(), DataType::Int64),
+                    Field::new("tsun".into(), DataType::Float64), // Parse as Float64, cast later
                 ]),
                 Frequency::Climate => Schema::from_iter(vec![
                     Field::new("start_year".into(), DataType::Int64),
@@ -214,7 +214,7 @@ impl WeatherDataLoader {
                     Field::new("prcp".into(), DataType::Float64),
                     Field::new("wspd".into(), DataType::Float64),
                     Field::new("pres".into(), DataType::Float64),
-                    Field::new("tsun".into(), DataType::Int64),
+                    Field::new("tsun".into(), DataType::Float64), // Parse as Float64, cast later
                 ]),
             };
             let schema_len = schema.len();
@@ -251,7 +251,7 @@ impl WeatherDataLoader {
                 cache: true,
             };
 
-            // Apply type parsing logic for date/datetime columns
+            // Apply type parsing and cast float representations back to native i64
             lazy_df = match data_type {
                 Frequency::Hourly => {
                     lazy_df.with_columns([
@@ -262,6 +262,12 @@ impl WeatherDataLoader {
                             .cast(DataType::Datetime(TimeUnit::Milliseconds, None))
                             + duration(DurationArgs::new().with_hours(col("hour"))))
                         .alias("datetime"),
+                        // Safely cast numeric float formats to Int64
+                        col("rhum").cast(DataType::Int64),
+                        col("snow").cast(DataType::Int64),
+                        col("wdir").cast(DataType::Int64),
+                        col("tsun").cast(DataType::Int64),
+                        col("coco").cast(DataType::Int64),
                     ])
                 }
                 Frequency::Daily => {
@@ -271,11 +277,17 @@ impl WeatherDataLoader {
                             .str()
                             .strptime(DataType::Date, date_options, lit("raise"))
                             .alias("date"),
+                        // Safely cast numeric float formats to Int64
+                        col("snow").cast(DataType::Int64),
+                        col("wdir").cast(DataType::Int64),
+                        col("tsun").cast(DataType::Int64),
                     ])
                 }
                 Frequency::Monthly | Frequency::Climate => {
-                    // Already parsed natively in CsvReadOptions schema configuration
-                    lazy_df
+                    lazy_df.with_columns([
+                        // Safely cast numeric float formats to Int64
+                        col("tsun").cast(DataType::Int64),
+                    ])
                 }
             };
 
