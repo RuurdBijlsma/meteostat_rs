@@ -199,7 +199,7 @@ impl StationLocator {
 
         let mut stations_with_dist: Vec<(Station, f64)> = self
             .rtree
-            .nearest_neighbor_iter(&query_point_rtree)
+            .nearest_neighbor_iter(query_point_rtree)
             .take(candidate_limit)
             .filter_map(|station| {
                 // Use filter_map for combined Haversine calc + distance filter
@@ -250,7 +250,7 @@ impl StationLocator {
         let iteration_limit = n_results + 1;
         let mut items_checked = 0;
 
-        for station in self.rtree.nearest_neighbor_iter(&query_point_rtree) {
+        for station in self.rtree.nearest_neighbor_iter(query_point_rtree) {
             items_checked += 1;
 
             // --- 1. Check inventory criteria (relatively cheap) ---
@@ -458,7 +458,7 @@ mod tests {
     }
 
     // --- Individual test cases remain largely the same, calling locator.query(...) ---
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_basic_query_no_filters() -> Result<(), LocateStationError> {
         let locator = get_locator().await?;
         let lat = 40.7128;
@@ -475,7 +475,7 @@ mod tests {
         validate_results(&results, n, max_d);
         Ok(())
     }
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_query_with_frequency_any_date() -> Result<(), LocateStationError> {
         let locator = get_locator().await?;
         let lat = 52.5200;
@@ -498,7 +498,7 @@ mod tests {
         }
         Ok(())
     }
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_query_with_frequency_specific_date() -> Result<(), LocateStationError> {
         let locator = get_locator().await?;
         let lat = 34.0522;
@@ -527,7 +527,7 @@ mod tests {
         }
         Ok(())
     }
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_query_with_frequency_date_range_complete_containment(
     ) -> Result<(), LocateStationError> {
         let locator = get_locator().await?;
@@ -562,7 +562,7 @@ mod tests {
         }
         Ok(())
     }
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_query_climate_data() -> Result<(), LocateStationError> {
         let locator = get_locator().await?;
         let lat = -33.8688;
@@ -581,7 +581,7 @@ mod tests {
         validate_results(&results, n, max_d);
         Ok(())
     }
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_query_no_results_tight_radius() -> Result<(), LocateStationError> {
         let locator = get_locator().await?;
         let lat = 0.0;
@@ -599,7 +599,7 @@ mod tests {
         assert!(results.is_empty());
         Ok(())
     }
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_query_n_results_zero() -> Result<(), LocateStationError> {
         let locator = get_locator().await?;
         let lat = 40.7128;
@@ -616,7 +616,7 @@ mod tests {
         assert!(results.is_empty());
         Ok(())
     }
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_query_specific_date_outside_range() -> Result<(), LocateStationError> {
         let locator = get_locator().await?;
         let lat = 51.5074;

@@ -101,7 +101,10 @@ impl WeatherDataLoader {
             Self::cache_dataframe(df, &parquet_path).await?;
         }
 
-        LazyFrame::scan_parquet(parquet_path.clone(), ScanArgsParquet::default())
+        let pl_path = PlRefPath::try_from_path(&parquet_path)
+            .map_err(|e| WeatherDataError::ParquetScan(parquet_path.clone(), e))?;
+
+        LazyFrame::scan_parquet(pl_path, ScanArgsParquet::default())
             .map_err(|e| WeatherDataError::ParquetScan(parquet_path, e))
     }
 
@@ -201,7 +204,7 @@ impl WeatherDataLoader {
                 });
             }
 
-            df.set_column_names(schema_names.iter().copied())
+            df.set_column_names(&schema_names)
                 .map_err(|e| WeatherDataError::ColumnRenameError {
                     station: station_owned.clone(),
                     source: e,

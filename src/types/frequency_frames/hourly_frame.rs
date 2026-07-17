@@ -423,6 +423,7 @@ impl HourlyLazyFrame {
         for i in 0..df.height() {
             // Get datetime (essential) - skip row if missing/invalid
             let naive_dt_opt: Option<NaiveDateTime> = dt_ca
+                .phys
                 .get(i)
                 // dt_ca gives Option<i64> (ms timestamp), convert to NaiveDateTime
                 .and_then(DateTime::from_timestamp_millis)
@@ -443,14 +444,14 @@ impl HourlyLazyFrame {
                 datetime: datetime_utc,
                 temperature: temp_ca.get(i),
                 dew_point: dwpt_ca.get(i),
-                relative_humidity: rhum_ca.get(i).and_then(|v| i32::try_from(v).ok()), // Convert Option<i64> to Option<i32>
+                relative_humidity: rhum_ca.get(i).and_then(|v| i32::try_from(v).ok()),
                 precipitation: prcp_ca.get(i),
-                snow: snow_ca.get(i).and_then(|v| i32::try_from(v).ok()), // Convert Option<i64> to Option<i32>
-                wind_direction: wdir_ca.get(i).and_then(|v| i32::try_from(v).ok()), // Convert Option<i64> to Option<i32>
+                snow: snow_ca.get(i).and_then(|v| i32::try_from(v).ok()),
+                wind_direction: wdir_ca.get(i).and_then(|v| i32::try_from(v).ok()),
                 wind_speed: wspd_ca.get(i),
                 peak_wind_gust: wpgt_ca.get(i),
                 pressure: pres_ca.get(i),
-                sunshine_minutes: tsun_ca.get(i).and_then(|v| i32::try_from(v).ok()), // Convert Option<i64> to Option<i32>
+                sunshine_minutes: tsun_ca.get(i).and_then(|v| i32::try_from(v).ok()),
                 condition,
             };
 
@@ -478,7 +479,7 @@ mod tests {
         DateTime::from_timestamp_millis(ms).unwrap().naive_utc()
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_hourly_frame_new_schema() -> Result<(), Box<dyn std::error::Error>> {
         let hourly_lazy = get_test_hourly_frame().await?;
 
@@ -507,7 +508,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_hourly_frame_filter_temp() -> Result<(), Box<dyn std::error::Error>> {
         let hourly_lazy = get_test_hourly_frame().await?;
 
@@ -518,7 +519,7 @@ mod tests {
         if df.height() > 0 {
             println!("Found {} hours with temp < 0.0", df.height());
             let temp_series = df.column("temp")?.f64()?;
-            assert!(temp_series.into_iter().all(|opt_temp| match opt_temp {
+            assert!(temp_series.iter().all(|opt_temp| match opt_temp  {
                 Some(t) => t < 0.0,
                 None => true, // Allow nulls
             }));
@@ -529,7 +530,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_hourly_frame_get_at_specific_datetime() -> Result<(), Box<dyn std::error::Error>>
     {
         let hourly_lazy = get_test_hourly_frame().await?;
@@ -552,7 +553,7 @@ mod tests {
         );
 
         // Verify the datetime in that row matches the expected rounded hour start
-        let dt_ms = df.column("datetime")?.datetime()?.get(0).unwrap();
+        let dt_ms = df.column("datetime")?.datetime()?.phys.get(0).unwrap();
         let retrieved_naive_dt = ms_to_datetime(dt_ms);
         assert_eq!(retrieved_naive_dt, expected_hour_start_naive);
 
@@ -573,7 +574,7 @@ mod tests {
             "Expected exactly one row for hour nearest {} (rounds up)",
             target_dt_round_up
         );
-        let dt_round_up_ms = df_round_up.column("datetime")?.datetime()?.get(0).unwrap(); // Use new var name
+        let dt_round_up_ms = df_round_up.column("datetime")?.datetime()?.phys.get(0).unwrap(); // Use new var name
         let retrieved_round_up_naive_dt = ms_to_datetime(dt_round_up_ms);
         assert_eq!(
             retrieved_round_up_naive_dt,
@@ -583,7 +584,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_hourly_frame_get_range_datetime() -> Result<(), Box<dyn std::error::Error>> {
         let hourly_lazy = get_test_hourly_frame().await?;
         let start_dt = Utc.with_ymd_and_hms(2022, 8, 10, 6, 0, 0).unwrap();
@@ -610,7 +611,7 @@ mod tests {
         let start_naive = start_dt.naive_utc();
         let end_naive = end_dt.naive_utc();
         let dt_series = df.column("datetime")?.datetime()?; // ChronoNaiveDateTime series
-        assert!(dt_series.into_iter().all(|opt_ndt| {
+        assert!(dt_series.phys.iter().all(|opt_ndt| {
             match opt_ndt {
                 Some(ndt) => ms_to_datetime(ndt) >= start_naive && ms_to_datetime(ndt) <= end_naive,
                 None => false, // Datetime should not be null
@@ -620,7 +621,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_hourly_frame_get_for_period_day() -> Result<(), Box<dyn std::error::Error>> {
         let hourly_lazy = get_test_hourly_frame().await?;
         let target_day = NaiveDate::from_ymd_opt(2020, 11, 5).unwrap();
@@ -642,7 +643,7 @@ mod tests {
 
         // Verify all datetimes fall on the target day
         let dt_series = df.column("datetime")?.datetime()?;
-        assert!(dt_series.into_iter().all(|opt_ndt| {
+        assert!(dt_series.phys.iter().all(|opt_ndt| {
             match opt_ndt {
                 Some(ndt) => ms_to_datetime(ndt).date() == target_day,
                 None => false,
@@ -652,7 +653,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_hourly_frame_chaining_period_and_filter() -> Result<(), Box<dyn std::error::Error>>
     {
         let hourly_lazy = get_test_hourly_frame().await?;
@@ -679,7 +680,7 @@ mod tests {
             let wspd_series = df.column("wspd")?.f64()?;
 
             for i in 0..df.height() {
-                let ndt = dt_series.get(i).unwrap(); // use ndt here
+                let ndt = dt_series.phys.get(i).unwrap(); // use ndt here
                 let wspd_val = wspd_series.get(i).unwrap_or(0.0); // Default to 0 if null
 
                 assert_eq!(ms_to_datetime(ndt).date(), target_day); // use ndt here
@@ -690,7 +691,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_collect_hourly_vec() -> Result<(), Box<dyn std::error::Error>> {
         let hourly_lazy = get_test_hourly_frame().await?;
         let start_dt = Utc.with_ymd_and_hms(2023, 1, 5, 0, 0, 0).unwrap();
@@ -735,7 +736,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_collect_hourly_single_row_success() -> Result<(), Box<dyn std::error::Error>> {
         let hourly_lazy = get_test_hourly_frame().await?;
         let target_dt = Utc.with_ymd_and_hms(2021, 7, 10, 18, 0, 0).unwrap(); // Expect exact hour match
@@ -750,7 +751,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_collect_hourly_single_row_fail_multiple_rows(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let hourly_lazy = get_test_hourly_frame().await?;
@@ -775,7 +776,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_collect_hourly_single_row_fail_zero_rows(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let hourly_lazy = get_test_hourly_frame().await?;
@@ -799,7 +800,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_collect_hourly_vec_empty_result() -> Result<(), Box<dyn std::error::Error>> {
         let hourly_lazy = get_test_hourly_frame().await?;
         // Use a date far in the future, guaranteed to have no data

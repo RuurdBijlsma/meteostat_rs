@@ -381,7 +381,7 @@ impl DailyLazyFrame {
         // --- Iterate through rows and map ---
         for i in 0..df.height() {
             // Get date (essential) - skip row if missing/invalid
-            let date_opt: Option<NaiveDate> = date_ca
+            let date_opt: Option<NaiveDate> = date_ca.phys
                 .get(i)
                 .map(|days_since_epoch| epoch_date + Duration::days(i64::from(days_since_epoch)));
 
@@ -428,7 +428,7 @@ mod tests {
 
     // --- Existing Tests Remain Unchanged ---
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_daily_frame_new_schema() -> Result<(), Box<dyn std::error::Error>> {
         let daily_lazy = get_test_daily_frame().await?;
 
@@ -458,7 +458,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_daily_frame_filter_temp() -> Result<(), Box<dyn std::error::Error>> {
         let daily_lazy = get_test_daily_frame().await?;
 
@@ -469,7 +469,7 @@ mod tests {
         if df.height() > 0 {
             println!("Found {} days with tavg > 25.0", df.height());
             let temp_series = df.column("tavg")?.f64()?;
-            assert!(temp_series.into_iter().all(|opt_temp| match opt_temp {
+            assert!(temp_series.iter().all(|opt_temp| match opt_temp  {
                 Some(t) => t > 25.0,
                 None => true, // Allow nulls (should be filtered out by gt ideally)
             }));
@@ -487,7 +487,7 @@ mod tests {
         epoch + Duration::days(days as i64)
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_daily_frame_get_at_specific_date() -> Result<(), Box<dyn std::error::Error>> {
         let daily_lazy = get_test_daily_frame().await?;
         // Choose a date likely to exist in historical records
@@ -506,7 +506,7 @@ mod tests {
 
         // Verify the date in that row
         let date_series = df.column("date")?.date()?;
-        let retrieved_date_int = date_series.get(0).unwrap(); // Get date as i32 days since epoch
+        let retrieved_date_int = date_series.phys.get(0).unwrap(); // Get date as i32 days since epoch
         let actual_date = polars_date_to_naive(retrieved_date_int);
 
         assert_eq!(actual_date, target_date);
@@ -514,7 +514,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_daily_frame_get_range_naive_dates() -> Result<(), Box<dyn std::error::Error>> {
         let daily_lazy = get_test_daily_frame().await?;
         let start_date = NaiveDate::from_ymd_opt(2021, 3, 1).unwrap();
@@ -533,7 +533,7 @@ mod tests {
 
         // Verify dates are within the range
         let date_series = df.column("date")?.date()?;
-        assert!(date_series.into_iter().all(|opt_date_int| {
+        assert!(date_series.phys.iter().all(|opt_date_int| {
             match opt_date_int {
                 Some(di) => {
                     let d = polars_date_to_naive(di);
@@ -546,7 +546,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_daily_frame_get_for_period_year() -> Result<(), Box<dyn std::error::Error>> {
         let daily_lazy = get_test_daily_frame().await?;
         let target_year = Year(2019);
@@ -573,7 +573,7 @@ mod tests {
 
         // Verify all dates are within the target year
         let date_series = df.column("date")?.date()?;
-        assert!(date_series.into_iter().all(|opt_date_int| {
+        assert!(date_series.phys.iter().all(|opt_date_int| {
             match opt_date_int {
                 Some(di) => polars_date_to_naive(di).year() == target_year.get(),
                 None => false,
@@ -583,7 +583,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_daily_frame_get_range_empty_result() -> Result<(), Box<dyn std::error::Error>> {
         let daily_lazy = get_test_daily_frame().await?;
         // Use a past date range where no data exists
@@ -598,7 +598,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_daily_frame_chaining_range_and_filter() -> Result<(), Box<dyn std::error::Error>>
     {
         let daily_lazy = get_test_daily_frame().await?;
@@ -625,7 +625,7 @@ mod tests {
             let prcp_series = df.column("prcp")?.f64()?;
 
             for i in 0..df.height() {
-                let date_int = date_series.get(i).unwrap();
+                let date_int = date_series.phys.get(i).unwrap();
                 let prcp_val = prcp_series.get(i).unwrap_or(0.0); // Default to 0 if null
                 let date = polars_date_to_naive(date_int);
 
@@ -639,7 +639,7 @@ mod tests {
 
     // --- Collection Methods ---
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_collect_daily_vec() -> Result<(), Box<dyn std::error::Error>> {
         let daily_lazy = get_test_daily_frame().await?;
         let start_date = NaiveDate::from_ymd_opt(2023, 2, 1).unwrap();
@@ -676,7 +676,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_collect_daily_single_row_success() -> Result<(), Box<dyn std::error::Error>> {
         let daily_lazy = get_test_daily_frame().await?;
         let target_date = NaiveDate::from_ymd_opt(2021, 8, 22).unwrap(); // Expect data exists
@@ -692,7 +692,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_collect_daily_single_row_fail_multiple_rows(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let daily_lazy = get_test_daily_frame().await?;
@@ -717,7 +717,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_collect_daily_single_row_fail_zero_rows() -> Result<(), Box<dyn std::error::Error>>
     {
         let daily_lazy = get_test_daily_frame().await?;
@@ -741,7 +741,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_collect_daily_vec_empty_result() -> Result<(), Box<dyn std::error::Error>> {
         let daily_lazy = get_test_daily_frame().await?;
         // Use a date far in the past, guaranteed to have no data

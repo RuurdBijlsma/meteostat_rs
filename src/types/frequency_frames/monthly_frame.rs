@@ -439,7 +439,7 @@ mod tests {
         client.monthly().station("10384").call().await // Berlin Tempelhof
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_monthly_frame_new_schema() -> Result<(), Box<dyn std::error::Error>> {
         let monthly_lazy = get_test_monthly_frame().await?;
 
@@ -468,7 +468,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_monthly_frame_filter_temp() -> Result<(), Box<dyn std::error::Error>> {
         let monthly_lazy = get_test_monthly_frame().await?;
 
@@ -479,7 +479,7 @@ mod tests {
         if df.height() > 0 {
             println!("Found {} months with tavg > 20.0", df.height());
             let temp_series = df.column("tavg")?.f64()?;
-            assert!(temp_series.into_iter().all(|opt_temp| match opt_temp {
+            assert!(temp_series.iter().all(|opt_temp| match opt_temp {
                 Some(t) => t > 20.0,
                 None => true, // Allow nulls
             }));
@@ -490,7 +490,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_monthly_frame_get_at_specific_month() -> Result<(), Box<dyn std::error::Error>> {
         let monthly_lazy = get_test_monthly_frame().await?;
         // Choose a month likely to exist
@@ -518,7 +518,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_monthly_frame_get_range_specific_months() -> Result<(), Box<dyn std::error::Error>>
     {
         let monthly_lazy = get_test_monthly_frame().await?;
@@ -580,7 +580,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_monthly_frame_get_for_period_year() -> Result<(), Box<dyn std::error::Error>> {
         let monthly_lazy = get_test_monthly_frame().await?;
         let target_year = Year(2017);
@@ -606,13 +606,13 @@ mod tests {
         if df.height() > 0 {
             let year_series = df.column("year")?.i64()?;
             assert!(year_series
-                .into_iter()
+                .iter()
                 .all(|opt_year| opt_year.unwrap() == target_year.get() as i64));
 
             // If exactly 12, verify months are 1 through 12
             if df.height() == 12 {
                 let month_series = df.column("month")?.i64()?;
-                let mut months: Vec<i64> = month_series.into_iter().map(|m| m.unwrap()).collect();
+                let mut months: Vec<i64> = month_series.iter().map(|m| m.unwrap()).collect();
                 months.sort_unstable();
                 let expected_months: Vec<i64> = (1..=12).collect();
                 assert_eq!(months, expected_months);
@@ -622,7 +622,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_monthly_frame_get_range_empty_result() -> Result<(), Box<dyn std::error::Error>> {
         let monthly_lazy = get_test_monthly_frame().await?;
         // Use a past year range where no data exists
@@ -637,7 +637,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_monthly_frame_chaining_period_and_filter(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let monthly_lazy = get_test_monthly_frame().await?;
@@ -676,7 +676,7 @@ mod tests {
 
     // --- New Tests for Collection Methods ---
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_collect_monthly_vec() -> Result<(), Box<dyn std::error::Error>> {
         let monthly_lazy = get_test_monthly_frame().await?;
         let start_month = Month::new(1, 2021);
@@ -712,7 +712,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_collect_monthly_single_row_success() -> Result<(), Box<dyn std::error::Error>> {
         let monthly_lazy = get_test_monthly_frame().await?;
         let target_month = Month::new(7, 2019); // Expect data exists
@@ -730,7 +730,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_collect_monthly_single_row_fail_multiple_rows(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let monthly_lazy = get_test_monthly_frame().await?;
@@ -755,7 +755,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_collect_monthly_single_row_fail_zero_rows(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let monthly_lazy = get_test_monthly_frame().await?;
@@ -779,7 +779,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_collect_monthly_vec_empty_result() -> Result<(), Box<dyn std::error::Error>> {
         let monthly_lazy = get_test_monthly_frame().await?;
         // Use a date far in the past, guaranteed to have no data

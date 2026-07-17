@@ -1448,15 +1448,16 @@ dependencies = [
 
 [[package]]
 name = "hashbrown"
-version = "0.16.0"
+version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5419bdc4f6a9207fbeba6d11b604d481addf78ecd10c11ad51e76c2f6482748d"
+checksum = "841d1cc9bed7f9236f321df977030373f4a4163ae1a7dbfe1a51a2c1a51d9100"
 dependencies = [
  "allocator-api2",
  "equivalent",
  "foldhash 0.2.0",
  "rayon",
  "serde",
+ "serde_core",
 ]
 
 [[package]]
@@ -1847,7 +1848,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6717a8d2a5a929a1a2eb43a12812498ed141a0bcfb7e8f7844fbdbe4303bba9f"
 dependencies = [
  "equivalent",
- "hashbrown 0.16.0",
+ "hashbrown 0.16.1",
  "serde",
  "serde_core",
 ]
@@ -2693,7 +2694,7 @@ dependencies = [
  "getrandom 0.2.16",
  "getrandom 0.3.2",
  "half",
- "hashbrown 0.16.0",
+ "hashbrown 0.16.1",
  "itoa",
  "lz4",
  "num-traits",
@@ -2795,7 +2796,7 @@ dependencies = [
  "chrono",
  "either",
  "fast-float2",
- "hashbrown 0.16.0",
+ "hashbrown 0.16.1",
  "itoa",
  "num-traits",
  "polars-arrow 0.54.4",
@@ -2869,7 +2870,7 @@ dependencies = [
  "comfy-table",
  "either",
  "getrandom 0.3.2",
- "hashbrown 0.16.0",
+ "hashbrown 0.16.1",
  "indexmap 2.12.0",
  "itoa",
  "num-traits",
@@ -2903,7 +2904,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7b65a750bb99ea66be90c8a7e336f6f3a87427a0f7f89d2a40adae98314e9b27"
 dependencies = [
  "boxcar",
- "hashbrown 0.16.0",
+ "hashbrown 0.16.1",
  "polars-arrow 0.54.4",
  "polars-error 0.54.4",
  "polars-utils 0.54.4",
@@ -2968,7 +2969,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e21fdd37e8d9ef109f13d3454baffa0a57041cf60069123b8a2bd846c8ad0205"
 dependencies = [
  "bitflags 2.13.1",
- "hashbrown 0.16.0",
+ "hashbrown 0.16.1",
  "num-traits",
  "polars-arrow 0.54.4",
  "polars-buffer",
@@ -3040,7 +3041,7 @@ dependencies = [
  "fs4",
  "futures",
  "glob",
- "hashbrown 0.16.0",
+ "hashbrown 0.16.1",
  "home",
  "itoa",
  "memchr",
@@ -3226,7 +3227,7 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "either",
- "hashbrown 0.16.0",
+ "hashbrown 0.16.1",
  "hex",
  "indexmap 2.12.0",
  "libm",
@@ -3284,7 +3285,7 @@ dependencies = [
  "ethnum",
  "flate2",
  "futures",
- "hashbrown 0.16.0",
+ "hashbrown 0.16.1",
  "lz4",
  "num-traits",
  "polars-arrow 0.54.4",
@@ -3384,7 +3385,7 @@ dependencies = [
  "chrono-tz",
  "either",
  "futures",
- "hashbrown 0.16.0",
+ "hashbrown 0.16.1",
  "indexmap 2.12.0",
  "memmap2",
  "num-traits",
@@ -3665,7 +3666,7 @@ dependencies = [
  "foldhash 0.2.0",
  "futures",
  "half",
- "hashbrown 0.16.0",
+ "hashbrown 0.16.1",
  "indexmap 2.12.0",
  "libc",
  "memmap2",

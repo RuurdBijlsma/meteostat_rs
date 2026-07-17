@@ -203,7 +203,7 @@ mod tests {
             }) // Use appropriate error
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_cache_refresh_not_triggered_when_recent() -> Result<(), Box<dyn std::error::Error>>
     {
         let temp_dir = tempdir()?;
@@ -273,7 +273,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_cache_refresh_not_triggered_for_future_date(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = tempdir()?;
@@ -321,7 +321,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_cache_refresh_triggered_when_required_date_is_newer(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = tempdir()?;

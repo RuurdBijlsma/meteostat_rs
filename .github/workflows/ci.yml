@@ -44,8 +44,7 @@ jobs:
         run: |
           cargo clippy --all-features -- \
           -D warnings -W clippy::pedantic \
-          -W clippy::nursery -W rust-2018-idioms \
-          -A clippy::single-match-else
+          -W clippy::nursery
 
       # Run tests
       - name: Run tests

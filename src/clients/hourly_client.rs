@@ -210,7 +210,7 @@ mod tests {
     }
 
     // HOURLY
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_hourly_from_station_for_period() -> Result<(), MeteostatError> {
         let client = Meteostat::new().await?;
         let data = client
@@ -225,7 +225,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_hourly_from_station_with_filter() -> Result<(), MeteostatError> {
         let client = Meteostat::new().await?;
         let data = client
@@ -246,7 +246,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_hourly_from_station_at_specific_datetime() -> Result<(), MeteostatError> {
         let client = Meteostat::new().await?;
         let data = client
@@ -263,7 +263,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_hourly_from_location_for_period() -> Result<(), MeteostatError> {
         let client = Meteostat::new().await?;
         let data = client

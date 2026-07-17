@@ -771,7 +771,7 @@ mod tests {
         file.exists()
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_clear_weather_data_cache_per_station() -> Result<(), MeteostatError> {
         let temp_dir = tempdir()?;
         let cache_path = temp_dir.path().to_path_buf();
@@ -797,7 +797,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_clear_weather_data_cache() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = tempdir()?;
         let cache_path = temp_dir.path().to_path_buf();
@@ -861,14 +861,14 @@ mod tests {
 
     // --- Constructor Tests ---
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_new_constructor_succeeds() {
         // This test assumes default cache dir resolution works
         let result = Meteostat::new().await;
         assert!(result.is_ok());
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_with_cache_folder_constructor_succeeds() -> Result<(), Box<dyn std::error::Error>>
     {
         let temp_dir = tempdir()?;
@@ -886,7 +886,7 @@ mod tests {
 
     // --- find_stations Tests ---
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_find_stations_basic() -> Result<(), MeteostatError> {
         let client = Meteostat::new().await?;
         let location = berlin_location();
@@ -910,7 +910,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_find_stations_with_limit() -> Result<(), MeteostatError> {
         let client = Meteostat::new().await?;
         let location = berlin_location();
@@ -939,7 +939,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_find_stations_with_max_distance() -> Result<(), MeteostatError> {
         let client = Meteostat::new().await?;
         let location = berlin_location();
@@ -965,7 +965,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_find_stations_with_inventory_request() -> Result<(), MeteostatError> {
         let client = Meteostat::new().await?;
         let location = berlin_location();
@@ -1000,7 +1000,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_find_stations_no_results_far_away() -> Result<(), MeteostatError> {
         let client = Meteostat::new().await?;
         // A location likely far from any station
@@ -1022,7 +1022,7 @@ mod tests {
 
     // --- Error Handling Tests ---
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_data_from_location_no_station_within_radius() -> Result<(), MeteostatError> {
         let client = Meteostat::new().await?;
         let location = LatLon(0.0, 0.0); // Middle of Atlantic
@@ -1052,7 +1052,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_data_from_location_station_found_but_no_data_error() -> Result<(), MeteostatError>
     {
         // This test is harder to make deterministic without knowing specific station data gaps
@@ -1110,7 +1110,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_data_from_invalid_station_id() -> Result<(), MeteostatError> {
         let client = Meteostat::new().await?;
         let invalid_station_id = "INVALID_STATION_ID_123"; // Make it less likely to exist by chance

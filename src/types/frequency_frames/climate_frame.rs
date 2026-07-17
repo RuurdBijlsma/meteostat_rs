@@ -382,7 +382,7 @@ mod tests {
         client.climate().station("10384").call().await // Berlin Tempelhof
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_climate_frame_new() -> Result<(), MeteostatError> {
         let climate_lazy = get_test_climate_frame().await?;
         // Basic check: the frame exists and has the expected columns
@@ -415,7 +415,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_climate_frame_get_at_specific_month() -> Result<(), Box<dyn std::error::Error>> {
         let climate_lazy = get_test_climate_frame().await?;
 
@@ -451,7 +451,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_climate_frame_get_at_no_results() -> Result<(), Box<dyn std::error::Error>> {
         let climate_lazy = get_test_climate_frame().await?;
 
@@ -480,7 +480,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_climate_frame_chaining_filters() -> Result<(), Box<dyn std::error::Error>> {
         let climate_lazy = get_test_climate_frame().await?;
 
@@ -510,7 +510,7 @@ mod tests {
 
     // --- New Tests for Collection Methods ---
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_collect_climate_vec() -> Result<(), Box<dyn std::error::Error>> {
         let climate_lazy = get_test_climate_frame().await?;
 
@@ -543,7 +543,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_collect_climate_single_row_success() -> Result<(), MeteostatError> {
         let climate_lazy = get_test_climate_frame().await?;
         let target_start = Year(1991);
@@ -569,7 +569,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_collect_climate_single_row_fail_multiple_rows(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let climate_lazy = get_test_climate_frame().await?;
@@ -592,7 +592,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_collect_climate_single_row_fail_zero_rows(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let climate_lazy = get_test_climate_frame().await?;
@@ -618,7 +618,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_collect_climate_vec_empty_result() -> Result<(), Box<dyn std::error::Error>> {
         let climate_lazy = get_test_climate_frame().await?;
         // Filter to guarantee an empty result

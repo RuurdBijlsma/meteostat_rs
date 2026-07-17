@@ -205,7 +205,7 @@ mod tests {
         LatLon(52.520008, 13.404954)
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_daily_from_station_for_period() -> Result<(), MeteostatError> {
         let client = Meteostat::new().await?;
         let data = client
@@ -220,7 +220,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_daily_from_station_with_filter() -> Result<(), MeteostatError> {
         let client = Meteostat::new().await?;
         let data = client
@@ -239,7 +239,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_daily_from_station_at_specific_date() -> Result<(), MeteostatError> {
         let client = Meteostat::new().await?;
         let data = client
@@ -254,7 +254,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_daily_from_location_for_period() -> Result<(), MeteostatError> {
         let client = Meteostat::new().await?;
         let data = client

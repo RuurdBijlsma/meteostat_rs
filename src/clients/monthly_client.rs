@@ -201,7 +201,7 @@ mod tests {
     }
 
     // MONTHLY
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_monthly_from_station() -> Result<(), MeteostatError> {
         let client = Meteostat::new().await?;
         let data = client
@@ -217,7 +217,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_monthly_from_station_with_filter() -> Result<(), MeteostatError> {
         let client = Meteostat::new().await?;
         let data = client
@@ -240,7 +240,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_monthly_from_location() -> Result<(), MeteostatError> {
         let client = Meteostat::new().await?;
         let data = client
