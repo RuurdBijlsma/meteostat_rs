@@ -2,58 +2,13 @@
 //! including inventory, location, and identifiers. Also includes implementations
 //! necessary for spatial indexing using the `rstar` crate.
 
+use crate::types::rkyv_datetime::ChronoDateOption;
 use crate::LatLon;
-use chrono::{Datelike, NaiveDate};
+use chrono::NaiveDate;
 use rkyv::{Archive, Deserialize as ArchiveDeserialize, Serialize as ArchiveSerialize};
 use rstar::{PointDistance, RTreeObject, AABB};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-
-// Custom rkyv translation wrapper for chrono::NaiveDate
-pub struct NaiveDateAsDays;
-
-impl rkyv::with::ArchiveWith<chrono::NaiveDate> for NaiveDateAsDays {
-    type Archived = rkyv::Archived<i32>;
-    type Resolver = rkyv::Resolver<i32>;
-
-    fn resolve_with(
-        field: &chrono::NaiveDate,
-        resolver: Self::Resolver,
-        out: rkyv::Place<Self::Archived>,
-    ) {
-        let days = field.num_days_from_ce();
-        rkyv::Archive::resolve(&days, resolver, out);
-    }
-}
-
-impl<S: rkyv::rancor::Fallible + ?Sized> rkyv::with::SerializeWith<chrono::NaiveDate, S>
-    for NaiveDateAsDays
-where
-    i32: rkyv::Serialize<S>,
-{
-    fn serialize_with(
-        field: &chrono::NaiveDate,
-        serializer: &mut S,
-    ) -> Result<Self::Resolver, S::Error> {
-        let days = field.num_days_from_ce();
-        rkyv::Serialize::serialize(&days, serializer)
-    }
-}
-
-impl<D: rkyv::rancor::Fallible + ?Sized>
-    rkyv::with::DeserializeWith<rkyv::Archived<i32>, chrono::NaiveDate, D> for NaiveDateAsDays
-where
-    rkyv::Archived<i32>: rkyv::Deserialize<i32, D>,
-{
-    fn deserialize_with(
-        field: &rkyv::Archived<i32>,
-        deserializer: &mut D,
-    ) -> Result<chrono::NaiveDate, D::Error> {
-        let days = rkyv::Deserialize::deserialize(field, deserializer)?;
-        Ok(chrono::NaiveDate::from_num_days_from_ce_opt(days)
-            .unwrap_or_else(|| chrono::NaiveDate::from_ymd_opt(1970, 1, 1).unwrap()))
-    }
-}
 
 // --- Data Structures ---
 
@@ -136,11 +91,9 @@ pub struct Inventory {
     ArchiveDeserialize,
 )]
 pub struct DateRange {
-    /// The earliest date for which data is reported available, if known.
-    #[rkyv(with = rkyv::with::Map<NaiveDateAsDays>)]
+    #[rkyv(with = ChronoDateOption)]
     pub start: Option<NaiveDate>,
-    /// The latest date for which data is reported available, if known.
-    #[rkyv(with = rkyv::with::Map<NaiveDateAsDays>)]
+    #[rkyv(with = ChronoDateOption)]
     pub end: Option<NaiveDate>,
 }
 
