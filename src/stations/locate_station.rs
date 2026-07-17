@@ -122,18 +122,19 @@ impl StationLocator {
             }
         })
         .await??;
-
         let path_buf = cache_path.to_path_buf();
         tokio::task::spawn_blocking(move || {
             let parent = path_buf.parent().ok_or_else(|| {
                 LocateStationError::CacheWrite(
                     path_buf.clone(),
-                    std::io::Error::new(std::io::ErrorKind::NotFound, "No parent directory"),
+                    io::Error::new(io::ErrorKind::NotFound, "No parent directory"),
                 )
             })?;
+            if path_buf.exists() {
+                return Ok::<(), LocateStationError>(());
+            }
             let mut temp_file = tempfile::NamedTempFile::new_in(parent)
                 .map_err(|e| LocateStationError::CacheWrite(path_buf.clone(), e))?;
-
             use std::io::Write;
             temp_file
                 .write_all(&rkyv_data)
@@ -141,13 +142,15 @@ impl StationLocator {
             temp_file
                 .flush()
                 .map_err(|e| LocateStationError::CacheWrite(path_buf.clone(), e))?;
-
             if path_buf.exists() {
-                let _ = std::fs::remove_file(&path_buf);
+                return Ok::<(), LocateStationError>(());
             }
-            temp_file
-                .persist(&path_buf)
-                .map_err(|e| LocateStationError::CacheWrite(path_buf.clone(), e.error))?;
+            if let Err(err) = temp_file.persist(&path_buf) {
+                if path_buf.exists() {
+                    return Ok::<(), LocateStationError>(());
+                }
+                return Err(LocateStationError::CacheWrite(path_buf.clone(), err.error));
+            }
             Ok::<(), LocateStationError>(())
         })
         .await??;

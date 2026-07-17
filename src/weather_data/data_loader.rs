@@ -331,20 +331,27 @@ impl WeatherDataLoader {
                     std::io::Error::new(std::io::ErrorKind::NotFound, "No parent directory"),
                 )
             })?;
+            if path_buf.exists() {
+                return Ok::<(), WeatherDataError>(());
+            }
             let mut temp_file = NamedTempFile::new_in(parent)
                 .map_err(|e| WeatherDataError::ParquetWriteIo(path_buf.clone(), e))?;
-
             ParquetWriter::new(&mut temp_file)
                 .with_compression(ParquetCompression::Snappy)
                 .finish(&mut df)
                 .map_err(|e| WeatherDataError::ParquetWritePolars(path_buf.clone(), e))?;
-
             if path_buf.exists() {
-                let _ = std::fs::remove_file(&path_buf);
+                return Ok::<(), WeatherDataError>(());
             }
-            temp_file
-                .persist(&path_buf)
-                .map_err(|e| WeatherDataError::ParquetWriteIo(path_buf.clone(), e.error))?;
+            if let Err(err) = temp_file.persist(&path_buf) {
+                if path_buf.exists() {
+                    return Ok::<(), WeatherDataError>(());
+                }
+                return Err(WeatherDataError::ParquetWriteIo(
+                    path_buf.clone(),
+                    err.error,
+                ));
+            }
             Ok::<(), WeatherDataError>(())
         })
         .await??;

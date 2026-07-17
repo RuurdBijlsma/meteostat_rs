@@ -20,7 +20,7 @@ impl rkyv::with::ArchiveWith<Option<NaiveDate>> for ChronoDateOption {
 }
 
 impl<S: rkyv::rancor::Fallible + ?Sized> rkyv::with::SerializeWith<Option<NaiveDate>, S>
-for ChronoDateOption
+    for ChronoDateOption
 {
     fn serialize_with(
         _field: &Option<NaiveDate>,
@@ -31,8 +31,7 @@ for ChronoDateOption
 }
 
 impl<D: rkyv::rancor::Fallible + ?Sized>
-rkyv::with::DeserializeWith<rkyv::rend::i32_le, Option<NaiveDate>, D>
-for ChronoDateOption
+    rkyv::with::DeserializeWith<rkyv::rend::i32_le, Option<NaiveDate>, D> for ChronoDateOption
 {
     fn deserialize_with(
         field: &rkyv::rend::i32_le,
