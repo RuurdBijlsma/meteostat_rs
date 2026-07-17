@@ -195,7 +195,7 @@ impl StationLocator {
             return self.fast_proximity_query(latitude, longitude, n_results, max_distance_km);
         }
 
-        // --- Filtered path: Use heap + heuristic limit ---
+        // --- Filtered path: Use heap ---
         self.filtered_heap_query(
             latitude,
             longitude,
@@ -256,7 +256,7 @@ impl StationLocator {
         stations_with_dist
     }
 
-    /// Query using `BinaryHeap` for filtering, with a heuristic limit on R-Tree iteration.
+    /// Query using `BinaryHeap` for filtering.
     fn filtered_heap_query(
         &self,
         latitude: f64,
@@ -277,13 +277,12 @@ impl StationLocator {
         for station in self.rtree.nearest_neighbor_iter(query_point_rtree) {
             items_checked += 1;
 
-            // --- 1. Check inventory criteria (relatively cheap) ---
-            // Pass frequency by value (it's Copy), required_date by ref.
+            // --- Check inventory criteria (relatively cheap) ---
             if !Self::station_meets_criteria(station, Some(frequency), required_date.as_ref()) {
                 continue;
             }
 
-            // --- 2. Calculate Haversine distance (more expensive) ---
+            // --- Calculate Haversine distance (more expensive) ---
             let station_loc = HaversineLocation {
                 latitude: station.location.latitude,
                 longitude: station.location.longitude,
@@ -297,7 +296,7 @@ impl StationLocator {
                 Units::Kilometers,
             );
 
-            // --- 3. Check max distance ---
+            // --- Check max distance ---
             if dist_km > max_distance_km * 2.0 {
                 // It's Joever.
                 break;
@@ -307,7 +306,6 @@ impl StationLocator {
                 continue;
             }
 
-            // --- 4. Manage the heap ---
             let current_candidate = StationCandidate {
                 distance_km: OrderedFloat(dist_km),
                 station,
@@ -324,7 +322,7 @@ impl StationLocator {
                 }
             }
 
-            // --- 5. Heuristic Early Exit Check ---
+            // Heuristic Early Exit Check ---
             // If we have checked enough items and the heap is full,
             // assume we are unlikely to find a better candidate later.
             // This is the key performance optimization for filtered queries.
@@ -333,7 +331,7 @@ impl StationLocator {
             }
         } // End R-tree iteration
 
-        // --- 6. Extract results from the heap ---
+        // --- Extract results from the heap ---
         let results: Vec<(Station, f64)> = heap
             .into_sorted_vec() // Sorts ascending by distance (based on Ord impl)
             .into_iter()
