@@ -17,39 +17,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Rust setup
-      - uses: actions-rs/toolchain@v1
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
-          profile: minimal
-          override: true
           components: rustfmt, clippy
 
-      - name: Cache dependencies
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
 
+      # Install and cache system dependencies
       - name: Cache and install system dependencies
-        uses: awalsh128/cache-apt-pkgs-action@latest
+        uses: awalsh128/cache-apt-pkgs-action@v1
         with:
           packages: libfontconfig1-dev pkg-config
           version: 1.0
 
-      # Build the code
-      - name: Build
-        run: cargo build --all-targets --all-features
-
-      # Format check
       - name: Check formatting
         run: cargo fmt --all -- --check
 
+      # Build
+      - name: Build
+        run: cargo build --all-targets --all-features
+
       # Run Clippy
-      - name: Run Clippy (strict)
+      - name: Run Clippy
         run: |
           cargo clippy --all-features -- \
           -D warnings -W clippy::pedantic \
