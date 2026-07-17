@@ -402,8 +402,7 @@ mod tests {
         for col_name in expected_cols {
             assert!(
                 actual_cols.contains(&&PlSmallStr::from_str(col_name)),
-                "Expected column '{}' not found",
-                col_name
+                "Expected column '{col_name}' not found"
             );
         }
         // Check key column types (as read by Polars)
@@ -444,9 +443,9 @@ mod tests {
         let row_end_year = df.column("end_year")?.i64()?.get(0).unwrap();
         let row_month = df.column("month")?.i64()?.get(0).unwrap();
 
-        assert_eq!(row_start_year, start_yr.get() as i64);
-        assert_eq!(row_end_year, end_yr.get() as i64);
-        assert_eq!(row_month, target_month as i64);
+        assert_eq!(row_start_year, i64::from(start_yr.get()));
+        assert_eq!(row_end_year, i64::from(end_yr.get()));
+        assert_eq!(row_month, i64::from(target_month));
 
         Ok(())
     }
@@ -460,7 +459,7 @@ mod tests {
         let end_yr = Year(1830);
         let target_month = 13u32; // Invalid month
 
-        let no_results_lazy_period = climate_lazy.clone().get_at(start_yr, end_yr, 1); // Valid month, invalid period
+        let no_results_lazy_period = climate_lazy.get_at(start_yr, end_yr, 1); // Valid month, invalid period
         let no_results_lazy_month = climate_lazy.get_at(Year(1991), Year(2020), target_month); // Valid period, invalid month
 
         let df_period = no_results_lazy_period.frame.collect()?;
@@ -496,7 +495,7 @@ mod tests {
         if df.height() == 1 {
             let tmax_val: f64 = df.column("tmax")?.f64()?.get(0).unwrap();
             assert!(tmax_val > 20.0, "Max temp should be > 20.0");
-            println!("Filtered July (tmax > 20.0) data found: {}", df);
+            println!("Filtered July (tmax > 20.0) data found: {df}");
         } else {
             println!(
                 "Filtered July 1991-2020 data with tmax > 20.0 not found (height: {})",
@@ -509,14 +508,14 @@ mod tests {
     }
 
     // --- New Tests for Collection Methods ---
-
+    #[allow(clippy::cast_possible_wrap)]
     #[tokio::test(flavor = "multi_thread")]
     async fn test_collect_climate_vec() -> Result<(), Box<dyn std::error::Error>> {
         let climate_lazy = get_test_climate_frame().await?;
 
         // Collect all available climate normals (usually 12 for 1961-1990 and 12 for 1991-2020)
         let climate_vec = climate_lazy.collect_climate()?;
-        let df_height = climate_lazy.frame.clone().collect()?.height(); // Get expected height
+        let df_height = climate_lazy.frame.collect()?.height(); // Get expected height
 
         // Check if collection matches collected DataFrame height (after potential parsing skips)
         // Allow for slight discrepancies if parsing fails on edge cases, but should be close
@@ -532,7 +531,7 @@ mod tests {
 
         // Check the first record if it exists
         if let Some(first_record) = climate_vec.first() {
-            println!("First collected record: {:?}", first_record);
+            println!("First collected record: {first_record:?}");
             assert!(first_record.start_year == 1961 || first_record.start_year == 1991); // Common periods
             assert!(first_record.month >= 1 && first_record.month <= 12);
             assert!(
@@ -555,7 +554,7 @@ mod tests {
         // Use collect_single_climate, handling potential missing data for this specific entry
         match single_climate_lazy.collect_single_climate() {
             Ok(climate_record) => {
-                println!("Collected single record: {:?}", climate_record);
+                println!("Collected single record: {climate_record:?}");
                 assert_eq!(climate_record.start_year, target_start.get());
                 assert_eq!(climate_record.end_year, target_end.get());
                 assert_eq!(climate_record.month, target_month);
@@ -579,14 +578,14 @@ mod tests {
 
         assert!(result.is_err());
         let err = result.err().unwrap();
-        println!("Got expected error: {:?}", err);
+        println!("Got expected error: {err:?}");
 
         match err {
             MeteostatError::ExpectedSingleRow { actual } => {
                 // Should be 12 if data is complete, but might be less
-                assert!(actual > 1, "Expected actual rows to be > 1, got {}", actual);
+                assert!(actual > 1, "Expected actual rows to be > 1, got {actual}");
             }
-            _ => panic!("Expected MeteostatError::ExpectedSingleRow, got {:?}", err),
+            _ => panic!("Expected MeteostatError::ExpectedSingleRow, got {err:?}"),
         }
 
         Ok(())
@@ -606,13 +605,13 @@ mod tests {
 
         assert!(result.is_err());
         let err = result.err().unwrap();
-        println!("Got expected error: {:?}", err);
+        println!("Got expected error: {err:?}");
 
         match err {
             MeteostatError::ExpectedSingleRow { actual } => {
-                assert_eq!(actual, 0, "Expected actual rows to be 0, got {}", actual);
+                assert_eq!(actual, 0, "Expected actual rows to be 0, got {actual}");
             }
-            _ => panic!("Expected MeteostatError::ExpectedSingleRow, got {:?}", err),
+            _ => panic!("Expected MeteostatError::ExpectedSingleRow, got {err:?}"),
         }
 
         Ok(())

@@ -494,8 +494,7 @@ mod tests {
         for col_name in expected_cols {
             assert!(
                 actual_cols.contains(&&PlSmallStr::from_str(col_name)),
-                "Expected column '{}' not found in hourly data",
-                col_name
+                "Expected column '{col_name}' not found in hourly data"
             );
         }
         // Check datetime column type
@@ -519,10 +518,9 @@ mod tests {
         if df.height() > 0 {
             println!("Found {} hours with temp < 0.0", df.height());
             let temp_series = df.column("temp")?.f64()?;
-            assert!(temp_series.iter().all(|opt_temp| match opt_temp {
-                Some(t) => t < 0.0,
-                None => true, // Allow nulls
-            }));
+            assert!(temp_series
+                .iter()
+                .all(|opt_temp| opt_temp.is_none_or(|t| t < 0.0)));
         } else {
             println!("No hours found with temp < 0.0 in the test data subset.");
         }
@@ -548,8 +546,7 @@ mod tests {
         assert_eq!(
             df.height(),
             1,
-            "Expected exactly one row for hour nearest {}",
-            target_dt_precise
+            "Expected exactly one row for hour nearest {target_dt_precise}"
         );
 
         // Verify the datetime in that row matches the expected rounded hour start
@@ -571,8 +568,7 @@ mod tests {
         assert_eq!(
             df_round_up.height(),
             1,
-            "Expected exactly one row for hour nearest {} (rounds up)",
-            target_dt_round_up
+            "Expected exactly one row for hour nearest {target_dt_round_up} (rounds up)"
         );
         let dt_round_up_ms = df_round_up
             .column("datetime")?
@@ -602,14 +598,11 @@ mod tests {
         // Allow for potentially missing hours
         assert!(
             df.height() <= expected_rows,
-            "Should have at most {} rows for the 6-hour period",
-            expected_rows
+            "Should have at most {expected_rows} rows for the 6-hour period"
         );
         assert!(
             df.height() > 0,
-            "Should find some data for the period {}-{}",
-            start_dt,
-            end_dt
+            "Should find some data for the period {start_dt}-{end_dt}"
         );
 
         // Verify datetimes are within the range (using NaiveDateTime for comparison)
@@ -617,10 +610,9 @@ mod tests {
         let end_naive = end_dt.naive_utc();
         let dt_series = df.column("datetime")?.datetime()?; // ChronoNaiveDateTime series
         assert!(dt_series.phys.iter().all(|opt_ndt| {
-            match opt_ndt {
-                Some(ndt) => ms_to_datetime(ndt) >= start_naive && ms_to_datetime(ndt) <= end_naive,
-                None => false, // Datetime should not be null
-            }
+            opt_ndt.is_some_and(|ndt| {
+                ms_to_datetime(ndt) >= start_naive && ms_to_datetime(ndt) <= end_naive
+            })
         }));
 
         Ok(())
@@ -637,22 +629,17 @@ mod tests {
         // Expect up to 24 rows for a full day
         assert!(
             df.height() <= 24,
-            "Should have at most 24 rows for day {}",
-            target_day
+            "Should have at most 24 rows for day {target_day}"
         );
         assert!(
             df.height() > 12, // Expect decent coverage for a day
-            "Should have found a reasonable number of hours for day {}",
-            target_day
+            "Should have found a reasonable number of hours for day {target_day}"
         );
 
         // Verify all datetimes fall on the target day
         let dt_series = df.column("datetime")?.datetime()?;
         assert!(dt_series.phys.iter().all(|opt_ndt| {
-            match opt_ndt {
-                Some(ndt) => ms_to_datetime(ndt).date() == target_day,
-                None => false,
-            }
+            opt_ndt.is_some_and(|ndt| ms_to_datetime(ndt).date() == target_day)
         }));
 
         Ok(())
@@ -720,7 +707,7 @@ mod tests {
 
         // Check the first record if it exists
         if let Some(first_record) = hourly_vec.first() {
-            println!("First collected record: {:?}", first_record);
+            println!("First collected record: {first_record:?}");
             assert!(first_record.datetime >= start_dt);
             assert!(first_record.datetime <= end_dt);
             // Example check on a field (temp might be None, check definition)
@@ -728,7 +715,6 @@ mod tests {
             // Check condition mapping (might be None)
             if let Some(code_i64) = hourly_lazy
                 .frame
-                .clone()
                 .limit(1)
                 .collect()?
                 .column("coco")?
@@ -749,7 +735,7 @@ mod tests {
         let single_hour_lazy = hourly_lazy.get_at(target_dt)?;
         let hourly_record = single_hour_lazy.collect_single_hourly()?;
 
-        println!("Collected single record: {:?}", hourly_record);
+        println!("Collected single record: {hourly_record:?}");
         assert_eq!(hourly_record.datetime, target_dt);
         // Can add more assertions based on expected data for that hour if known
         assert!(hourly_record.temperature.is_some()); // Example check
@@ -769,13 +755,13 @@ mod tests {
 
         assert!(result.is_err());
         let err = result.err().unwrap();
-        println!("Got expected error: {:?}", err);
+        println!("Got expected error: {err:?}");
 
         match err {
             MeteostatError::ExpectedSingleRow { actual } => {
-                assert!(actual > 1, "Expected actual rows to be > 1, got {}", actual);
+                assert!(actual > 1, "Expected actual rows to be > 1, got {actual}");
             }
-            _ => panic!("Expected MeteostatError::ExpectedSingleRow, got {:?}", err),
+            _ => panic!("Expected MeteostatError::ExpectedSingleRow, got {err:?}"),
         }
 
         Ok(())
@@ -793,13 +779,13 @@ mod tests {
 
         assert!(result.is_err());
         let err = result.err().unwrap();
-        println!("Got expected error: {:?}", err);
+        println!("Got expected error: {err:?}");
 
         match err {
             MeteostatError::ExpectedSingleRow { actual } => {
-                assert_eq!(actual, 0, "Expected actual rows to be 0, got {}", actual);
+                assert_eq!(actual, 0, "Expected actual rows to be 0, got {actual}");
             }
-            _ => panic!("Expected MeteostatError::ExpectedSingleRow, got {:?}", err),
+            _ => panic!("Expected MeteostatError::ExpectedSingleRow, got {err:?}"),
         }
 
         Ok(())

@@ -444,8 +444,7 @@ mod tests {
         for col_name in expected_cols {
             assert!(
                 actual_cols.contains(&&PlSmallStr::from_str(col_name)),
-                "Expected column '{}' not found in daily data",
-                col_name
+                "Expected column '{col_name}' not found in daily data"
             );
         }
         // Check date column type
@@ -470,10 +469,9 @@ mod tests {
         if df.height() > 0 {
             println!("Found {} days with tavg > 25.0", df.height());
             let temp_series = df.column("tavg")?.f64()?;
-            assert!(temp_series.iter().all(|opt_temp| match opt_temp {
-                Some(t) => t > 25.0,
-                None => true, // Allow nulls (should be filtered out by gt ideally)
-            }));
+            assert!(temp_series
+                .iter()
+                .all(|opt_temp| opt_temp.is_none_or(|t| t > 25.0)));
         } else {
             println!("No days found with tavg > 25.0 in the test data subset.");
             // This is acceptable if the station/period doesn't have such days
@@ -485,7 +483,7 @@ mod tests {
     // Helper function to convert polars date int to NaiveDate
     fn polars_date_to_naive(days: i32) -> NaiveDate {
         let epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
-        epoch + Duration::days(days as i64)
+        epoch + Duration::days(i64::from(days))
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -501,8 +499,7 @@ mod tests {
         assert_eq!(
             df.height(),
             1,
-            "Expected exactly one row for date {}",
-            target_date
+            "Expected exactly one row for date {target_date}"
         );
 
         // Verify the date in that row
@@ -535,13 +532,10 @@ mod tests {
         // Verify dates are within the range
         let date_series = df.column("date")?.date()?;
         assert!(date_series.phys.iter().all(|opt_date_int| {
-            match opt_date_int {
-                Some(di) => {
-                    let d = polars_date_to_naive(di);
-                    d >= start_date && d <= end_date
-                }
-                None => false, // Date should not be null
-            }
+            opt_date_int.is_some_and(|di| {
+                let d = polars_date_to_naive(di);
+                d >= start_date && d <= end_date
+            })
         }));
 
         Ok(())
@@ -575,10 +569,7 @@ mod tests {
         // Verify all dates are within the target year
         let date_series = df.column("date")?.date()?;
         assert!(date_series.phys.iter().all(|opt_date_int| {
-            match opt_date_int {
-                Some(di) => polars_date_to_naive(di).year() == target_year.get(),
-                None => false,
-            }
+            opt_date_int.is_some_and(|di| polars_date_to_naive(di).year() == target_year.get())
         }));
 
         Ok(())
@@ -664,7 +655,7 @@ mod tests {
 
         // Check the first record if it exists
         if let Some(first_record) = daily_vec.first() {
-            println!("First collected record: {:?}", first_record);
+            println!("First collected record: {first_record:?}");
             assert!(first_record.date >= start_date);
             assert!(first_record.date <= end_date);
             // Example check on a field
@@ -685,7 +676,7 @@ mod tests {
         let single_day_lazy = daily_lazy.get_at(target_date)?;
         let daily_record = single_day_lazy.collect_single_daily()?;
 
-        println!("Collected single record: {:?}", daily_record);
+        println!("Collected single record: {daily_record:?}");
         assert_eq!(daily_record.date, target_date);
         // Can add more assertions based on expected data for that day if known
         assert!(daily_record.average_temperature.is_some()); // Example check
@@ -706,13 +697,13 @@ mod tests {
 
         assert!(result.is_err());
         let err = result.err().unwrap();
-        println!("Got expected error: {:?}", err);
+        println!("Got expected error: {err:?}");
 
         match err {
             MeteostatError::ExpectedSingleRow { actual } => {
-                assert!(actual > 1, "Expected actual rows to be > 1, got {}", actual);
+                assert!(actual > 1, "Expected actual rows to be > 1, got {actual}");
             }
-            _ => panic!("Expected MeteostatError::ExpectedSingleRow, got {:?}", err),
+            _ => panic!("Expected MeteostatError::ExpectedSingleRow, got {err:?}"),
         }
 
         Ok(())
@@ -730,13 +721,13 @@ mod tests {
 
         assert!(result.is_err());
         let err = result.err().unwrap();
-        println!("Got expected error: {:?}", err);
+        println!("Got expected error: {err:?}");
 
         match err {
             MeteostatError::ExpectedSingleRow { actual } => {
-                assert_eq!(actual, 0, "Expected actual rows to be 0, got {}", actual);
+                assert_eq!(actual, 0, "Expected actual rows to be 0, got {actual}");
             }
-            _ => panic!("Expected MeteostatError::ExpectedSingleRow, got {:?}", err),
+            _ => panic!("Expected MeteostatError::ExpectedSingleRow, got {err:?}"),
         }
 
         Ok(())

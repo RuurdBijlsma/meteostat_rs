@@ -4,6 +4,7 @@ use meteostat::{Frequency, InventoryRequest, LatLon, Meteostat, RequiredData, Ye
 use std::hint::black_box;
 use tokio::runtime::Runtime;
 
+#[allow(clippy::too_many_lines)]
 fn bench(c: &mut Criterion) {
     let station_str = "10637";
 

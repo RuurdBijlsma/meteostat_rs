@@ -762,11 +762,11 @@ mod tests {
 
     // Helper to create a known location (Berlin Mitte)
     fn berlin_location() -> LatLon {
-        LatLon(52.520008, 13.404954)
+        LatLon(52.520_008, 13.404_954)
     }
 
     /// Helper function to check if a cache file exists
-    async fn cache_file_exists(cache_dir: &Path, station: &str, frequency: Frequency) -> bool {
+    fn cache_file_exists(cache_dir: &Path, station: &str, frequency: Frequency) -> bool {
         let file = cache_dir.join(format!("{}-{}.parquet", frequency.path_segment(), station));
         file.exists()
     }
@@ -782,8 +782,12 @@ mod tests {
         let stations = client.find_stations().location(berlin).call();
         let station_id = &stations.first().unwrap().station.id;
         let _lf = client.hourly().station(station_id).call().await?;
-        println!("Found station ID: {}", station_id);
-        assert!(cache_file_exists(&cache_path, station_id, Frequency::Hourly).await);
+        println!("Found station ID: {station_id}");
+        assert!(cache_file_exists(
+            &cache_path,
+            station_id,
+            Frequency::Hourly
+        ));
 
         // Clear cache for this station's hourly data
         client
@@ -791,7 +795,11 @@ mod tests {
             .await?;
 
         // Verify cache file is gone
-        assert!(!cache_file_exists(&cache_path, station_id, Frequency::Hourly).await);
+        assert!(!cache_file_exists(
+            &cache_path,
+            station_id,
+            Frequency::Hourly
+        ));
 
         temp_dir.close()?;
         Ok(())
@@ -837,7 +845,7 @@ mod tests {
                 if entry.file_name() == stations_filename {
                     stations_file_found = true;
                 }
-                println!("Found file after clear: {:?}", path); // Debug print
+                println!("Found file after clear: {path:?}"); // Debug print
             }
         }
 
@@ -925,8 +933,7 @@ mod tests {
         assert!(!stations.is_empty(), "Should find stations near Berlin");
         assert!(
             stations.len() <= limit,
-            "Should return at most {} stations",
-            limit
+            "Should return at most {limit} stations",
         );
         println!("Found {} stations (limit {}):", stations.len(), limit);
         for result in &stations {
@@ -1023,6 +1030,7 @@ mod tests {
     // --- Error Handling Tests ---
 
     #[tokio::test(flavor = "multi_thread")]
+    #[allow(clippy::float_cmp)]
     async fn test_data_from_location_no_station_within_radius() -> Result<(), MeteostatError> {
         let client = Meteostat::new().await?;
         let location = LatLon(0.0, 0.0); // Middle of Atlantic
@@ -1037,7 +1045,7 @@ mod tests {
 
         assert!(result.is_err());
         let err = result.err().unwrap();
-        println!("Expected error: {:?}", err); // See the error details
+        println!("Expected error: {err:?}"); // See the error details
 
         // Manual check without `matches` macro:
         match err {
@@ -1046,7 +1054,7 @@ mod tests {
                 assert_eq!(lat, location.0);
                 assert_eq!(lon, location.1);
             }
-            _ => panic!("Expected NoStationWithinRadius error, got {:?}", err),
+            _ => panic!("Expected NoStationWithinRadius error, got {err:?}"),
         }
 
         Ok(())
@@ -1087,23 +1095,22 @@ mod tests {
 
         assert!(result.is_err());
         let err = result.err().unwrap();
-        println!("Expected error for future data requirement: {:?}", err);
+        println!("Expected error for future data requirement: {err:?}");
 
         match err {
             // This is the most likely error because the query itself finds no stations meeting the criteria
             MeteostatError::NoStationWithinRadius { .. } => {
                 // Test passed - expected this error type
-                println!("Got expected NoStationWithinRadius error due to impossible filter.")
+                println!("Got expected NoStationWithinRadius error due to impossible filter.");
             }
             // This might occur if the station query *did* return stations (e.g., if filtering logic changes)
             // but the subsequent data fetch failed.
             MeteostatError::NoDataFoundForNearbyStations { .. } => {
                 // Test passed - also an acceptable error type in this scenario
-                println!("Got NoDataFoundForNearbyStations error - filter might have passed but fetch failed.")
+                println!("Got NoDataFoundForNearbyStations error - filter might have passed but fetch failed.");
             }
             _ => panic!(
-                "Expected NoStationWithinRadius or NoDataFoundForNearbyStations error, got {:?}",
-                err
+                "Expected NoStationWithinRadius or NoDataFoundForNearbyStations error, got {err:?}"
             ),
         }
 
@@ -1125,13 +1132,12 @@ mod tests {
         // The exact error might depend on FrameFetcher's implementation (e.g., file not found, download error).
         assert!(result.is_err());
         let err = result.err().unwrap();
-        println!("Error fetching data for invalid station ID: {:?}", err);
+        println!("Error fetching data for invalid station ID: {err:?}");
 
         // The error should originate from the data fetching layer
         assert!(
             matches!(err, MeteostatError::WeatherData(_)),
-            "Expected a WeatherData error variant, got {:?}",
-            err
+            "Expected a WeatherData error variant, got {err:?}"
         );
 
         Ok(())
