@@ -107,7 +107,7 @@ impl StationLocator {
             serde_json::from_slice::<Vec<Station>>(&decompressed_json)
                 .map_err(LocateStationError::from)
         })
-            .await??;
+        .await??;
         Ok(stations)
     }
 
@@ -121,10 +121,37 @@ impl StationLocator {
                     .map_err(LocateStationError::CacheEncode)
             }
         })
-            .await??;
-        tokio::fs::write(&cache_path, &rkyv_data)
-            .await
-            .map_err(|e| LocateStationError::CacheWrite(cache_path.to_path_buf(), e))?;
+        .await??;
+
+        let path_buf = cache_path.to_path_buf();
+        tokio::task::spawn_blocking(move || {
+            let parent = path_buf.parent().ok_or_else(|| {
+                LocateStationError::CacheWrite(
+                    path_buf.clone(),
+                    std::io::Error::new(std::io::ErrorKind::NotFound, "No parent directory"),
+                )
+            })?;
+            let mut temp_file = tempfile::NamedTempFile::new_in(parent)
+                .map_err(|e| LocateStationError::CacheWrite(path_buf.clone(), e))?;
+
+            use std::io::Write;
+            temp_file
+                .write_all(&rkyv_data)
+                .map_err(|e| LocateStationError::CacheWrite(path_buf.clone(), e))?;
+            temp_file
+                .flush()
+                .map_err(|e| LocateStationError::CacheWrite(path_buf.clone(), e))?;
+
+            if path_buf.exists() {
+                let _ = std::fs::remove_file(&path_buf);
+            }
+            temp_file
+                .persist(&path_buf)
+                .map_err(|e| LocateStationError::CacheWrite(path_buf.clone(), e.error))?;
+            Ok::<(), LocateStationError>(())
+        })
+        .await??;
+
         Ok(())
     }
 
@@ -410,11 +437,7 @@ mod tests {
             .expect("Failed to initialize StationLocator"))
     }
 
-    fn validate_results(
-        results: &[(Station, f64)],
-        expected_max_len: usize,
-        max_distance_km: f64,
-    ) {
+    fn validate_results(results: &[(Station, f64)], expected_max_len: usize, max_distance_km: f64) {
         assert!(
             results.len() <= expected_max_len,
             "Expected max {} results, got {}",

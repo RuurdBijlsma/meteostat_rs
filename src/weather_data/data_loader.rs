@@ -321,19 +321,33 @@ impl WeatherDataLoader {
                 // Propagate the inner Result<DataFrame, WeatherDataError>
     }
 
-    /// Writes a `DataFrame` to a Parquet file asynchronously using `spawn_blocking`.
+    /// Writes a `DataFrame` to a Parquet file atomically using a temporary file.
     async fn cache_dataframe(mut df: DataFrame, path: &Path) -> Result<(), WeatherDataError> {
         let path_buf = path.to_path_buf();
         task::spawn_blocking(move || {
-            let file = std::fs::File::create(&path_buf)
+            let parent = path_buf.parent().ok_or_else(|| {
+                WeatherDataError::ParquetWriteIo(
+                    path_buf.clone(),
+                    std::io::Error::new(std::io::ErrorKind::NotFound, "No parent directory"),
+                )
+            })?;
+            let mut temp_file = NamedTempFile::new_in(parent)
                 .map_err(|e| WeatherDataError::ParquetWriteIo(path_buf.clone(), e))?;
-            ParquetWriter::new(file)
-                .with_compression(ParquetCompression::Snappy) // Snappy is generally a good balance
-                .finish(&mut df) // finish consumes df if mutable, or takes &mut df
-                .map_err(|e| WeatherDataError::ParquetWritePolars(path_buf, e))?;
+
+            ParquetWriter::new(&mut temp_file)
+                .with_compression(ParquetCompression::Snappy)
+                .finish(&mut df)
+                .map_err(|e| WeatherDataError::ParquetWritePolars(path_buf.clone(), e))?;
+
+            if path_buf.exists() {
+                let _ = std::fs::remove_file(&path_buf);
+            }
+            temp_file
+                .persist(&path_buf)
+                .map_err(|e| WeatherDataError::ParquetWriteIo(path_buf.clone(), e.error))?;
             Ok::<(), WeatherDataError>(())
         })
-        .await??; // Unwrap JoinError, then unwrap the inner Result
+        .await??;
         Ok(())
     }
 }
